@@ -1,0 +1,33 @@
+# Codex Handoff Protocol
+
+## Versioned State
+
+The storage provider contains immutable versions under `versions/<version_id>/` and a small mutable `head.json`. A version manifest records its parent version, source device, profile, and every copied file's size and SHA-256 digest. A version directory is published by staging it completely and then atomically moving it into the immutable namespace.
+
+`head.json` only points to the latest published version. Clients never infer ownership from filesystem modification time.
+
+## Device State
+
+Each device keeps its own state outside the synced profile:
+
+```json
+{"device_id":"macbook","last_applied_version":"v...","baseline_id":"b..."}
+```
+
+Before pushing, the client compares the remote head with its `last_applied_version`. If another device published a version since this device last pulled it, push stops with a stale-device error. The user must pull first or explicitly start a new handoff.
+
+## Immutable Baseline
+
+The first baseline is written once under `baseline/<baseline_id>/`. Creating a baseline when one already exists is an error. Restore, pruning, and normal sync do not delete or alter baseline files. Re-baselining is a separate explicit operation that creates a new baseline ID and archives the old one.
+
+## Apply and Restore
+
+An apply operation first creates a local backup snapshot, writes files through a staging directory, verifies all digests, and only then updates the device state. A failed apply leaves the target untouched where possible and always leaves the pre-apply backup available.
+
+## Portable Profiles
+
+Profiles are allowlists, not a copy of the entire `.codex` directory. They may include sessions, skills, plugins, and rules. Authentication, cache, lock, socket, temporary, and active database journal files are excluded by default. Platform-specific paths are represented relative to the state root.
+
+## Cloud Providers
+
+The core depends on a narrow provider interface. The local filesystem provider is the reference implementation and test oracle. Google Drive will implement the same operations using OAuth and resumable uploads; no provider is allowed to weaken version immutability or stale-device checks.
