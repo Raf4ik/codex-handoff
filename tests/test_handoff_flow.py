@@ -79,3 +79,20 @@ def test_protected_baseline_can_be_restored(tmp_path: Path) -> None:
     file.write_text("broken", encoding="utf-8")
     service.restore(baseline.version_id)
     assert file.read_text(encoding="utf-8") == original
+
+
+def test_restored_baseline_can_be_published_as_new_head(tmp_path: Path) -> None:
+    config = make_config(tmp_path, "mac")
+    service = HandoffService(config, LocalProvider(tmp_path / "remote"))
+    baseline = service.create_baseline()
+    file = config.source_dir / "sessions/current.json"
+    original = file.read_text(encoding="utf-8")
+    file.write_text("new work", encoding="utf-8")
+    previous = service.push()
+
+    service.restore(baseline.version_id)
+    restored = service.push()
+
+    assert file.read_text(encoding="utf-8") == original
+    assert restored.parent_version == previous.version_id
+    assert service.status()["remote_head"] == restored.version_id

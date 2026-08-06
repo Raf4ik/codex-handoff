@@ -6,10 +6,20 @@ from .models import Profile
 
 DEFAULT_PROFILE = Profile(
     name="safe",
-    include_roots=("sessions", "session_index.jsonl", "skills", "plugins", "rules"),
+    include_roots=(
+        "sessions",
+        "archived_sessions",
+        "attachments",
+        "session_index.jsonl",
+        "skills",
+        "plugins",
+        "rules",
+        "AGENTS.md",
+    ),
     exclude_globs=(
         "**/*.lock", "**/*.tmp", "**/*.temp", "**/*.log", "**/cache/**",
-        "**/.cache/**", "**/tmp/**", "**/*.sqlite-wal", "**/*.sqlite-shm",
+        "**/.cache/**", "**/tmp/**", "**/*.sqlite", "**/*.db",
+        "**/*.sqlite-wal", "**/*.sqlite-shm",
     ),
 )
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import socket
 import sys
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -21,12 +21,15 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStatusBar,
+    QStyle,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import AppConfig, default_config_path, default_workspace, load_config, save_config, validate_config
 from ..crypto import generate_recovery_key
+from ..processes import is_codex_running
 from ..service import HandoffService, create_provider
 
 
@@ -35,27 +38,34 @@ class SetupDialog(QDialog):
         super().__init__()
         self.config_path = config_path
         self.setWindowTitle("Codex Handoff Setup")
-        self.setMinimumWidth(620)
+        self.setMinimumWidth(700)
+        existing = load_config(config_path) if config_path.is_file() else None
         form = QFormLayout()
-        self.device = QLineEdit(socket.gethostname())
-        self.source = QLineEdit(str(Path.home() / ".codex"))
-        self.workspace = QLineEdit(str(default_workspace()))
+        self.device = QLineEdit(existing.device_id if existing else socket.gethostname())
+        self.source = QLineEdit(str(existing.source_dir if existing else Path.home() / ".codex"))
+        self.workspace = QLineEdit(str(existing.workspace_dir if existing else default_workspace()))
         self.provider = QComboBox()
-        self.provider.addItem("Local folder", "local")
         self.provider.addItem("Google Drive", "google_drive")
-        self.storage = QLineEdit(str(Path.home() / "CodexHandoffStorage"))
-        self.secrets = QLineEdit()
-        self.recovery_key = QLineEdit(str(default_workspace() / "recovery.key"))
+        self.provider.addItem("Local folder", "local")
+        self.storage = QLineEdit(str(existing.local_storage_dir if existing and existing.local_storage_dir else Path.home() / "CodexHandoffStorage"))
+        self.secrets = QLineEdit(str(existing.google_client_secrets or "") if existing else "")
+        self.recovery_key = QLineEdit(str(existing.encryption_key_file if existing and existing.encryption_key_file else default_workspace() / "recovery.key"))
+        for field in (self.source, self.workspace, self.storage, self.secrets, self.recovery_key):
+            field.setCursorPosition(0)
+        if existing:
+            self.provider.setCurrentIndex(self.provider.findData(existing.provider))
+        self.storage_row = self._path_row(self.storage, False)
+        self.secrets_row = self._path_row(self.secrets, True)
         form.addRow("Device name", self.device)
         form.addRow("Codex state", self._path_row(self.source, False))
         form.addRow("Local workspace", self._path_row(self.workspace, False))
         form.addRow("Cloud provider", self.provider)
-        form.addRow("Local provider folder", self._path_row(self.storage, False))
-        form.addRow("Google OAuth JSON", self._path_row(self.secrets, True))
+        form.addRow("Local provider folder", self.storage_row)
+        form.addRow("Google OAuth JSON", self.secrets_row)
         form.addRow("Recovery key", self._recovery_key_row())
         note = QLabel(
             "Google Drive opens a browser for OAuth. The OAuth JSON and token remain on this device. "
-            "Codex must be closed for baseline, push, pull, and restore."
+            "Confirmed operations wait until Codex is closed."
         )
         note.setWordWrap(True)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
@@ -65,12 +75,20 @@ class SetupDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(note)
         layout.addWidget(buttons)
+        self.provider.currentIndexChanged.connect(self._update_provider_fields)
+        self._update_provider_fields()
+
+    def _update_provider_fields(self) -> None:
+        google_drive = self.provider.currentData() == "google_drive"
+        self.secrets_row.setEnabled(google_drive)
+        self.storage_row.setEnabled(not google_drive)
 
     def _path_row(self, field: QLineEdit, file_mode: bool) -> QWidget:
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         button = QPushButton("Browse")
+        button.setIcon(self.style().standardIcon(QStyle.SP_DialogOpenButton))
         button.clicked.connect(lambda: self._browse(field, file_mode))
         layout.addWidget(field)
         layout.addWidget(button)
@@ -90,6 +108,8 @@ class SetupDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         select = QPushButton("Select")
         create = QPushButton("Create new")
+        select.setIcon(self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        create.setIcon(self.style().standardIcon(QStyle.SP_FileIcon))
         select.clicked.connect(lambda: self._browse(self.recovery_key, True))
         create.clicked.connect(self._create_recovery_key)
         layout.addWidget(self.recovery_key)
@@ -121,8 +141,8 @@ class SetupDialog(QDialog):
             source_dir=Path(self.source.text()).expanduser(),
             workspace_dir=Path(self.workspace.text()).expanduser(),
             provider=str(self.provider.currentData()),
-            local_storage_dir=Path(self.storage.text()).expanduser() if self.storage.text().strip() else None,
-            google_client_secrets=Path(self.secrets.text()).expanduser() if self.secrets.text().strip() else None,
+            local_storage_dir=Path(self.storage.text()).expanduser() if self.provider.currentData() == "local" else None,
+            google_client_secrets=Path(self.secrets.text()).expanduser() if self.provider.currentData() == "google_drive" else None,
             encryption_key_file=Path(self.recovery_key.text()).expanduser() if self.recovery_key.text().strip() else None,
         )
         try:
@@ -160,6 +180,9 @@ class MainWindow(QMainWindow):
         self.config = load_config(config_path)
         self.service: HandoffService | None = None
         self.pool = QThreadPool.globalInstance()
+        self.workers: set[Worker] = set()
+        self.last_notified_version: str | None = None
+        self.pending_operation: tuple[object, object] | None = None
         self.setWindowTitle("Codex Handoff")
         self.resize(820, 560)
         self.device_label = QLabel()
@@ -169,18 +192,28 @@ class MainWindow(QMainWindow):
         self.remote_label = QLabel()
         self.update_label = QLabel()
         self.versions = QListWidget()
-        self.baseline_button = QPushButton("Create protected baseline")
-        self.push_button = QPushButton("Send this device state")
-        self.pull_button = QPushButton("Receive available update")
-        self.restore_button = QPushButton("Restore selected version")
-        self.restore_baseline_button = QPushButton("Restore protected baseline")
+        self.baseline_button = QPushButton("Create baseline")
+        self.push_button = QPushButton("Send snapshot")
+        self.pull_button = QPushButton("Receive update")
+        self.restore_button = QPushButton("Restore selected")
+        self.restore_baseline_button = QPushButton("Restore baseline")
         self.refresh_button = QPushButton("Refresh")
+        self.cancel_wait_button = QPushButton("Cancel waiting")
+        self.cancel_wait_button.setVisible(False)
+        self.baseline_button.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.push_button.setIcon(self.style().standardIcon(QStyle.SP_ArrowUp))
+        self.pull_button.setIcon(self.style().standardIcon(QStyle.SP_ArrowDown))
+        self.refresh_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        self.restore_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        self.restore_baseline_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        self.cancel_wait_button.setIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton))
         self.baseline_button.clicked.connect(lambda: self._confirm_run("Create the immutable parent baseline?", self._baseline))
         self.push_button.clicked.connect(lambda: self._confirm_run("Publish this device state? Codex must be closed.", self._push))
         self.pull_button.clicked.connect(self._pull)
         self.restore_button.clicked.connect(self._restore)
         self.restore_baseline_button.clicked.connect(self._restore_baseline)
         self.refresh_button.clicked.connect(self.refresh)
+        self.cancel_wait_button.clicked.connect(self._cancel_pending_operation)
         controls = QHBoxLayout()
         for button in (self.baseline_button, self.push_button, self.pull_button, self.refresh_button):
             controls.addWidget(button)
@@ -198,10 +231,24 @@ class MainWindow(QMainWindow):
         body.addWidget(self.versions)
         body.addWidget(self.restore_button)
         body.addWidget(self.restore_baseline_button)
+        body.addWidget(self.cancel_wait_button)
         container = QWidget()
         container.setLayout(body)
         self.setCentralWidget(container)
         self.setStatusBar(QStatusBar())
+        app_icon = self.style().standardIcon(QStyle.SP_DriveNetIcon)
+        self.setWindowIcon(app_icon)
+        self.tray = QSystemTrayIcon(app_icon, self)
+        self.tray.setToolTip("Codex Handoff")
+        self.tray.show()
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setInterval(30_000)
+        self.refresh_timer.timeout.connect(self._background_refresh)
+        self.refresh_timer.start()
+        self.codex_wait_timer = QTimer(self)
+        self.codex_wait_timer.setInterval(1_000)
+        self.codex_wait_timer.timeout.connect(self._try_pending_operation)
+        self.codex_wait_timer.start()
         settings = QAction("Settings", self)
         settings.triggered.connect(self._settings)
         self.menuBar().addMenu("Codex Handoff").addAction(settings)
@@ -219,9 +266,22 @@ class MainWindow(QMainWindow):
     def _run(self, function, completed=None) -> None:
         self._set_busy(True)
         worker = Worker(function)
-        worker.signals.completed.connect(lambda value: self._done(value, completed))
-        worker.signals.failed.connect(self._failed)
+        self.workers.add(worker)
+        worker.signals.completed.connect(
+            lambda value, current=worker: self._worker_completed(current, value, completed)
+        )
+        worker.signals.failed.connect(
+            lambda message, current=worker: self._worker_failed(current, message)
+        )
         self.pool.start(worker)
+
+    def _worker_completed(self, worker: Worker, value: object, callback) -> None:
+        self.workers.discard(worker)
+        self._done(value, callback)
+
+    def _worker_failed(self, worker: Worker, message: str) -> None:
+        self.workers.discard(worker)
+        self._failed(message)
 
     def _done(self, value: object, callback) -> None:
         self._set_busy(False)
@@ -231,6 +291,8 @@ class MainWindow(QMainWindow):
             self.refresh()
 
     def _failed(self, message: str) -> None:
+        self.pending_operation = None
+        self.cancel_wait_button.setVisible(False)
         self._set_busy(False)
         self.statusBar().showMessage("Operation failed")
         QMessageBox.critical(self, "Codex Handoff", message)
@@ -239,11 +301,64 @@ class MainWindow(QMainWindow):
         for button in (self.baseline_button, self.push_button, self.pull_button, self.restore_button, self.restore_baseline_button, self.refresh_button):
             button.setEnabled(not busy)
 
+    def _run_when_codex_stopped(self, operation, completed=None) -> None:
+        """Queue a mutating operation and start it as soon as Codex exits."""
+        if not is_codex_running():
+            self._run(operation, completed)
+            return
+        self.pending_operation = (operation, completed)
+        self.cancel_wait_button.setVisible(True)
+        self._set_busy(True)
+        self.statusBar().showMessage("Close Codex; the confirmed operation will start automatically.")
+        QMessageBox.warning(
+            self,
+            "Close Codex",
+            "Codex is still running. Close it to continue. The confirmed operation will start automatically, or cancel it below.",
+        )
+
+    def _try_pending_operation(self) -> None:
+        if self.pending_operation is None:
+            return
+        if is_codex_running():
+            self.statusBar().showMessage("Waiting for Codex to close...")
+            return
+        operation, completed = self.pending_operation
+        self.pending_operation = None
+        self.cancel_wait_button.setVisible(False)
+        self._run(operation, completed)
+
+    def _cancel_pending_operation(self) -> None:
+        self.pending_operation = None
+        self.cancel_wait_button.setVisible(False)
+        self._set_busy(False)
+        self.statusBar().showMessage("Waiting operation cancelled", 5000)
+
     def refresh(self) -> None:
         if self.service is None:
             return
         self.statusBar().showMessage("Refreshing...")
         self._run(lambda: (self.service.status(), self.service.list_versions()), self._show_status)
+
+    def _background_refresh(self) -> None:
+        if self.service is None or self.pool.activeThreadCount() > 0:
+            return
+        worker = Worker(lambda: (self.service.status(), self.service.list_versions()))
+        self.workers.add(worker)
+        worker.signals.completed.connect(
+            lambda value, current=worker: self._background_completed(current, value)
+        )
+        worker.signals.failed.connect(
+            lambda message, current=worker: self._background_failed(current, message)
+        )
+        self.pool.start(worker)
+
+    def _background_completed(self, worker: Worker, value: object) -> None:
+        self.workers.discard(worker)
+        self._show_status(value)
+
+    def _background_failed(self, worker: Worker, message: str) -> None:
+        self.workers.discard(worker)
+        self.statusBar().showMessage(f"Background check failed: {message}", 5000)
 
     def _show_status(self, result: object) -> None:
         status, versions = result  # type: ignore[misc]
@@ -253,6 +368,20 @@ class MainWindow(QMainWindow):
         self.local_label.setText(str(status["last_applied_version"] or "None"))
         self.remote_label.setText(str(status["remote_head"] or "None"))
         self.update_label.setText("Available" if status["update_available"] else "Up to date")
+        if self.pending_operation is None:
+            has_baseline = bool(status["baseline_id"])
+            self.baseline_button.setEnabled(not has_baseline)
+            self.push_button.setEnabled(has_baseline)
+            self.restore_baseline_button.setEnabled(has_baseline)
+        if status["update_available"] and status["remote_head"] != self.last_notified_version:
+            source = status["remote_source"] or "another device"
+            self.tray.showMessage(
+                "Codex Handoff update available",
+                f"A new Codex snapshot from {source} is ready to review.",
+                QSystemTrayIcon.Information,
+                8000,
+            )
+            self.last_notified_version = str(status["remote_head"])
         self.versions.clear()
         for version in versions:
             self.versions.addItem(f"{version.version_id} | {version.source_device} | {version.created_at}")
@@ -260,7 +389,7 @@ class MainWindow(QMainWindow):
 
     def _confirm_run(self, question: str, operation) -> None:
         if QMessageBox.question(self, "Confirm", question) == QMessageBox.Yes:
-            self._run(operation, lambda _: self.refresh())
+            self._run_when_codex_stopped(operation, lambda _: self.refresh())
 
     def _baseline(self):
         assert self.service
@@ -282,7 +411,7 @@ class MainWindow(QMainWindow):
         text = f"Apply {preview.version_id} from {preview.source_device}?\nAdded: {len(preview.added)}\nChanged: {len(preview.changed)}"
         if QMessageBox.question(self, "Apply update", text) == QMessageBox.Yes:
             assert self.service
-            self._run(self.service.pull, lambda _: self.refresh())
+            self._run_when_codex_stopped(self.service.pull, lambda _: self.refresh())
 
     def _restore(self) -> None:
         item = self.versions.currentItem()
@@ -295,7 +424,9 @@ class MainWindow(QMainWindow):
     def _restore_baseline(self) -> None:
         if self.service is None:
             return
-        baseline_id = self.service.status().get("baseline_id")
+        baseline_id = self.baseline_label.text()
+        if baseline_id == "Not created":
+            baseline_id = ""
         if not baseline_id:
             QMessageBox.information(self, "Codex Handoff", "No protected baseline is available.")
             return
