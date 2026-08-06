@@ -6,6 +6,8 @@ __pycache__/
 htmlcov/
 build/
 dist/
+build-lite/
+dist-lite/
 *.egg-info/
 *.spec
 .DS_Store

@@ -18,10 +18,13 @@ def state(root: Path, value: str) -> Path:
 def test_artifact_excludes_credentials_and_applies_portable_files(tmp_path: Path) -> None:
     source = state(tmp_path / "source", "from-mac")
     target = state(tmp_path / "target", "old-windows")
+    (source / "archived_sessions").mkdir()
+    (source / "archived_sessions" / "old.jsonl").write_text("archived", encoding="utf-8")
+    (source / "AGENTS.md").write_text("portable instructions", encoding="utf-8")
     artifact = tmp_path / "snapshot.zip"
     manifest = build_artifact(source, artifact, version_id="v1", parent_version=None, device_id="mac")
 
-    assert [entry.path for entry in manifest.files] == ["sessions/one.json"]
+    assert [entry.path for entry in manifest.files] == ["AGENTS.md", "archived_sessions/old.jsonl", "sessions/one.json"]
     preview = preview_artifact(artifact, target)
     assert preview.changed == ("sessions/one.json",)
     apply_artifact(artifact, target, tmp_path / "staging")

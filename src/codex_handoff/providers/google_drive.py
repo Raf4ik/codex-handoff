@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -23,7 +24,10 @@ def authorize(client_secrets: Path, token_path: Path):
     if token_path.is_file():
         credentials = Credentials.from_authorized_user_file(str(token_path), SCOPES)
     if credentials and credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
+        try:
+            credentials.refresh(Request())
+        except RefreshError:
+            credentials = None
     if not credentials or not credentials.valid:
         flow = InstalledAppFlow.from_client_secrets_file(str(client_secrets), SCOPES)
         credentials = flow.run_local_server(port=0, open_browser=True)
@@ -62,13 +66,20 @@ class GoogleDriveProvider:
 
     def _files(self) -> list[dict]:
         query = f"'{self.folder_id}' in parents and trashed=false"
-        response = self.service.files().list(
-            q=query,
-            spaces="drive",
-            fields="files(id,name,createdTime,appProperties)",
-            pageSize=1000,
-        ).execute()
-        return list(response.get("files", []))
+        result: list[dict] = []
+        page_token = None
+        while True:
+            response = self.service.files().list(
+                q=query,
+                spaces="drive",
+                fields="nextPageToken,files(id,name,createdTime,appProperties)",
+                pageSize=1000,
+                pageToken=page_token,
+            ).execute()
+            result.extend(response.get("files", []))
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                return result
 
     def baseline_ids(self) -> list[str]:
         return sorted(

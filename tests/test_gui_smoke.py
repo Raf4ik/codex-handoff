@@ -1,13 +1,72 @@
 from pathlib import Path
+import time
 
 from PySide6.QtWidgets import QApplication
 
-from codex_handoff.gui.app import SetupDialog
+from codex_handoff.config import AppConfig, save_config
+from codex_handoff.crypto import generate_recovery_key
+from codex_handoff.gui.app import MainWindow, SetupDialog
 
 
 def test_setup_dialog_constructs(tmp_path: Path) -> None:
     app = QApplication.instance() or QApplication([])
     dialog = SetupDialog(tmp_path / "config.json")
     assert dialog.windowTitle() == "Codex Handoff Setup"
+    assert dialog.provider.currentData() == "google_drive"
+    assert dialog.secrets_row.isEnabled()
+    assert not dialog.storage_row.isEnabled()
     dialog.close()
     assert app is not None
+
+
+def test_setup_dialog_loads_existing_settings(tmp_path: Path) -> None:
+    app = QApplication.instance() or QApplication([])
+    config_path = tmp_path / "config.json"
+    config = AppConfig(
+        device_id="windows-laptop",
+        source_dir=tmp_path / "codex",
+        workspace_dir=tmp_path / "workspace",
+        provider="local",
+        local_storage_dir=tmp_path / "storage",
+        encryption_key_file=tmp_path / "recovery.key",
+    )
+    save_config(config, config_path)
+    dialog = SetupDialog(config_path)
+    assert dialog.device.text() == "windows-laptop"
+    assert dialog.provider.currentData() == "local"
+    assert dialog.storage_row.isEnabled()
+    assert not dialog.secrets_row.isEnabled()
+    dialog.close()
+    assert app is not None
+
+
+def test_main_window_keeps_background_workers_alive(tmp_path: Path, monkeypatch) -> None:
+    app = QApplication.instance() or QApplication([])
+    source = tmp_path / "codex"
+    (source / "sessions").mkdir(parents=True)
+    key = generate_recovery_key(tmp_path / "recovery.key")
+    config_path = tmp_path / "config.json"
+    save_config(
+        AppConfig(
+            device_id="macbook",
+            source_dir=source,
+            workspace_dir=tmp_path / "workspace",
+            provider="local",
+            local_storage_dir=tmp_path / "storage",
+            encryption_key_file=key,
+        ),
+        config_path,
+    )
+    monkeypatch.setattr("codex_handoff.service.is_codex_running", lambda: False)
+
+    window = MainWindow(config_path)
+    deadline = time.monotonic() + 3
+    while not window.device_label.text() and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+
+    assert window.service is not None
+    assert window.device_label.text() == "macbook"
+    assert window.statusBar().currentMessage() == "Ready"
+    window.close()
+    window.pool.waitForDone(1000)

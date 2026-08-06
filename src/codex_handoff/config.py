@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,7 +26,10 @@ class AppConfig:
 
     @property
     def token_path(self) -> Path:
-        return Path(user_config_dir("Codex Handoff")) / "google-token.json"
+        suffix = "default"
+        if self.google_client_secrets and self.google_client_secrets.is_file():
+            suffix = hashlib.sha256(self.google_client_secrets.read_bytes()).hexdigest()[:12]
+        return Path(user_config_dir("Codex Handoff")) / f"google-token-{suffix}.json"
 
 
 def default_config_path() -> Path:
@@ -46,6 +50,10 @@ def save_config(config: AppConfig, path: Path | None = None) -> Path:
     temporary = destination.with_suffix(".tmp")
     temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     temporary.replace(destination)
+    try:
+        destination.chmod(0o600)
+    except OSError:
+        pass
     return destination
 
 
