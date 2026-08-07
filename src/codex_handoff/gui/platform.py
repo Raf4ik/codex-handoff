@@ -147,8 +147,10 @@ def _powershell_quote(path: Path) -> str:
 
 
 def _create_macos_alias(application: Path, desktop_dir: Path | None = None) -> Path:
+    supplied = str(application).replace("\\", "/")
     resolved = application.resolve(strict=False)
-    if str(resolved).startswith("/Volumes/"):
+    resolved_text = str(resolved).replace("\\", "/")
+    if supplied.startswith("/Volumes/") or resolved_text.startswith("/Volumes/"):
         raise PlatformIntegrationError("Move Codex Handoff to Applications before creating its desktop alias")
     desktop = desktop_dir or Path.home() / "Desktop"
     desktop.mkdir(parents=True, exist_ok=True)

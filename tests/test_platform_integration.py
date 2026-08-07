@@ -17,10 +17,17 @@ def test_platform_labels_and_codex_paths(tmp_path: Path) -> None:
     assert macos.codex_dir == tmp_path / ".codex"
 
 
-def test_macos_desktop_alias_rejects_app_on_mounted_dmg() -> None:
+@pytest.mark.parametrize(
+    "application",
+    (
+        Path("/Volumes/Codex Handoff/CodexHandoff.app"),
+        Path(r"\Volumes\Codex Handoff\CodexHandoff.app"),
+    ),
+)
+def test_macos_desktop_alias_rejects_app_on_mounted_dmg(application: Path) -> None:
     with pytest.raises(platform_module.PlatformIntegrationError, match="Applications"):
         platform_module.create_desktop_shortcut(
-            Path("/Volumes/Codex Handoff/CodexHandoff.app"),
+            application,
             platform_key="macos",
         )
 
