@@ -21,6 +21,7 @@ Each device stores its own `last_applied_version`. A push is rejected when the r
 - `config.py`: local configuration and credential paths.
 - `gui/`: PySide6 UI; no synchronization logic lives in widgets.
 - `cli.py`: automation and diagnostic interface over the same service.
+- `updater.py`: low-frequency GitHub Release discovery, package selection, SHA-256 verification, and platform update launch.
 
 ## Google Drive Layout
 
@@ -30,7 +31,9 @@ Google Drive is not a transactional database, so simultaneous publication remain
 
 ## GUI
 
-The five-step first-run wizard collects the device name, platform-specific Codex state path, provider, pairing mode, local storage path or Google OAuth client file, recovery key, integration preferences, and local workspace path. The first computer creates a two-device pair; the second or replacement computer joins it and must initialize from the latest version or protected baseline before publishing. The dashboard shows Codex process state, current remote version, last applied version, protected baseline, version history, recovery, and settings. Its lightweight remote-head monitor checks every 60 seconds and uses 2/5/15-minute backoff after failures. It displays a system notification without accepting anything automatically. Destructive actions always show the Added, Changed, Removed, and Unchanged preview before confirmation. A confirmed operation waits while Codex is running and starts when the process closes; the user can cancel the waiting operation.
+The five-step first-run wizard collects the interface language, device name, platform-specific Codex state path, provider, pairing mode, local storage path or Google OAuth client file, recovery key, integration preferences, and local workspace path. English is the default; Russian can be selected during setup or changed live in Settings. The first computer creates a two-device pair; the second or replacement computer joins it and must initialize from the latest version or protected baseline before publishing. The dashboard shows Codex process state, current remote version, last applied version, protected baseline, version history, recovery, and settings. Its lightweight remote-head monitor checks every 60 seconds and uses 2/5/15-minute backoff after failures. It displays a system notification without accepting anything automatically. Destructive actions always show the Added, Changed, Removed, and Unchanged preview before confirmation. A confirmed operation waits while Codex is running and starts when the process closes; the user can cancel the waiting operation.
+
+Installed applications make one delayed update check after launch and then one check every 24 hours. No CPU-consuming polling loop runs between checks. A newer platform package can be downloaded only after confirmation, is verified against `SHA256SUMS`, and requires a second confirmation before installation. Windows updates the existing Inno Setup installation. macOS replaces the installed bundle from a detached helper and keeps a rollback copy until replacement succeeds.
 
 ## Distribution
 

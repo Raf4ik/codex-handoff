@@ -4,7 +4,7 @@ import time
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from codex_handoff.config import AppConfig, save_config
+from codex_handoff.config import AppConfig, load_config, save_config
 from codex_handoff.crypto import generate_recovery_key
 from codex_handoff.gui.app import MainWindow, SetupDialog
 from codex_handoff.gui.theme import app_icon_path, load_app_icon
@@ -132,5 +132,42 @@ def test_new_device_dashboard_requires_baseline_initialization(tmp_path: Path, m
     assert window.pull_button.isEnabled()
     assert window.pull_button.text() == "Initialize from baseline"
     assert "new device" in window.operation_banner.message.text().lower()
+    window.close()
+    window.pool.waitForDone(1000)
+
+
+def test_russian_dashboard_and_live_language_switch(tmp_path: Path, monkeypatch) -> None:
+    app = QApplication.instance() or QApplication([])
+    source = tmp_path / "codex"
+    (source / "sessions").mkdir(parents=True)
+    key = generate_recovery_key(tmp_path / "recovery.key")
+    config_path = tmp_path / "config.json"
+    save_config(
+        AppConfig(
+            device_id="macbook",
+            source_dir=source,
+            workspace_dir=tmp_path / "workspace",
+            provider="local",
+            local_storage_dir=tmp_path / "storage",
+            encryption_key_file=key,
+        ),
+        config_path,
+    )
+    monkeypatch.setattr("codex_handoff.service.is_codex_running", lambda: False)
+    window = MainWindow(config_path)
+    window.pool.waitForDone(3000)
+
+    window.language_combo.setCurrentIndex(window.language_combo.findData("ru"))
+    window.pool.waitForDone(3000)
+    deadline = time.monotonic() + 3
+    while window.statusBar().currentMessage() != "Готово" and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+
+    assert load_config(config_path).language == "ru"
+    assert window.nav_buttons[0].text() == "Синхронизация"
+    assert window.refresh_button.text() == "Обновить"
+    assert window.statusBar().currentMessage() == "Готово"
+    assert window.route.local_title.text() in {"Этот компьютер", "Этот Mac", "Это устройство"}
     window.close()
     window.pool.waitForDone(1000)

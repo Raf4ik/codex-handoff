@@ -15,6 +15,7 @@ class AppConfig:
     device_id: str
     source_dir: Path
     workspace_dir: Path
+    language: str = "en"
     pair_mode: str = "create_pair"
     provider: str = "local"
     local_storage_dir: Path | None = None
@@ -72,6 +73,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         device_id=str(raw["device_id"]),
         source_dir=Path(raw["source_dir"]).expanduser(),
         workspace_dir=Path(raw["workspace_dir"]).expanduser(),
+        language=str(raw.get("language", "en")),
         pair_mode=str(raw.get("pair_mode", "create_pair")),
         provider=str(raw.get("provider", "local")),
         local_storage_dir=Path(raw["local_storage_dir"]).expanduser() if raw.get("local_storage_dir") else None,
@@ -88,6 +90,8 @@ def load_config(path: Path | None = None) -> AppConfig:
 def validate_config(config: AppConfig) -> None:
     if not config.device_id.strip():
         raise ConfigurationError("Device ID is required")
+    if config.language not in {"en", "ru"}:
+        raise ConfigurationError("Language must be en or ru")
     if config.pair_mode not in {"create_pair", "join_pair"}:
         raise ConfigurationError("Pairing mode must be create_pair or join_pair")
     if not config.source_dir.is_dir():

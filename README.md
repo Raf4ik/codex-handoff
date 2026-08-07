@@ -29,6 +29,10 @@ The arrows describe the current publish direction; the same pair can synchronize
 
 ![Codex Handoff first-time setup wizard](docs/images/setup-wizard.png)
 
+### Russian Settings and Updates
+
+![Codex Handoff Russian settings and application updates](docs/images/settings-russian.png)
+
 ## Why It Exists
 
 Codex stores useful working state locally. Copying its entire data directory between computers is unsafe: it can include authentication data, machine-specific settings, caches, locks, temporary files, and databases that may still be in use.
@@ -76,6 +80,7 @@ Codex Handoff requests the limited `drive.file` scope. It can access files creat
 
 On first launch, select:
 
+- English or Russian as the interface language; English is the default;
 - a unique device name;
 - the local Codex state directory, normally `~/.codex`;
 - the application's local workspace;
@@ -196,6 +201,7 @@ Google Drive can see the application folder, encrypted object names, version ide
 - two-device pairing for macOS → Windows, Windows → macOS, Windows → Windows, and macOS → macOS;
 - PySide6 desktop GUI and command-line interface;
 - first-run configuration wizard;
+- English interface by default with a complete Russian option in setup and Settings;
 - Google Drive OAuth and resumable uploads;
 - local-folder provider for development, testing, or user-managed shared storage;
 - bidirectional versioned synchronization;
@@ -211,6 +217,7 @@ Google Drive can see the application folder, encrypted object names, version ide
 - cryptographic integrity and archive-path verification;
 - automated tests for snapshots, encryption, providers, process detection, GUI behavior, and the end-to-end local synchronization flow;
 - branded GitHub Actions builds: a DMG for Apple Silicon macOS and a per-user Setup installer for 64-bit Windows.
+- consent-based in-app update checks with SHA-256 verification and in-place installation.
 
 ## Storage Model
 
@@ -237,6 +244,8 @@ Python, Qt, and the required libraries are bundled into both downloads. End user
 On Windows, run the Setup executable. It installs Codex Handoff for the current user, creates Start menu and Desktop shortcuts, enables background startup by default, and registers an uninstaller in Windows Settings. Uninstalling removes the application, shortcuts, and autostart entry while retaining user configuration, recovery material, and backups.
 
 On macOS, open the DMG and drag `CodexHandoff.app` to the `Applications` alias. Launch the installed copy from Applications. During first-run setup, the enabled Desktop shortcut option creates a Finder alias named `Codex Handoff` on the Desktop. The alias is intentionally created only after the application has been moved out of the mounted DMG.
+
+Starting with Beta 3, the installed application checks GitHub Releases shortly after launch and then once every 24 hours. A successful-check timestamp prevents repeated application launches from creating extra requests. A normal check is one small metadata request and consumes no CPU between checks. A newer package is downloaded only after confirmation, verified against the release `SHA256SUMS`, and installed only after a second confirmation. Windows Setup replaces the existing installation in place. On macOS, a detached helper keeps a temporary rollback copy while replacing the installed app. User configuration, recovery material, baselines, versions, and backups are stored outside the application and remain unchanged. Beta 2 must be upgraded to Beta 3 manually once because the older binary does not contain the updater.
 
 The builds are currently unsigned. macOS Gatekeeper or Windows SmartScreen may display a warning on first launch. Removing these warnings requires Apple Developer ID notarization and a Windows Authenticode certificate; those paid credentials are not included in this free open-source project. See [desktop builds](docs/BUILDING.md).
 
@@ -338,9 +347,11 @@ macOS -> Google Drive -> macOS
 
 ### Что уже реализовано
 
-Проект включает общее Python-ядро, CLI, графический интерфейс PySide6, мастер первого запуска, Google Drive OAuth, локальное тестовое хранилище, шифрование AES-256-GCM, проверку целостности, историю версий, уведомления, подтверждение обновлений, ожидание закрытия Codex, защиту от устаревшей публикации, восстановление, работу в области уведомлений, автозапуск и автоматические тесты.
+Проект включает общее Python-ядро, CLI, графический интерфейс PySide6, мастер первого запуска, Google Drive OAuth, локальное тестовое хранилище, шифрование AES-256-GCM, проверку целостности, историю версий, уведомления, подтверждение обновлений, ожидание закрытия Codex, защиту от устаревшей публикации, восстановление, работу в области уведомлений, автозапуск и автоматические тесты. Английский остаётся основным языком интерфейса, русский можно выбрать при первом запуске или в настройках.
 
 GitHub Actions собирает неподписанные `CodexHandoff-macOS-arm64.dmg` и `CodexHandoff-Windows-x64-Setup.exe`. Python уже встроен в обе сборки и отдельно пользователю не нужен. Windows Setup устанавливает программу для текущего пользователя, создаёт ярлыки на рабочем столе и в меню «Пуск», включает автозапуск по умолчанию и добавляет штатное удаление. На macOS пользователь переносит приложение из DMG в Applications, после чего мастер первого запуска создаёт псевдоним Finder на рабочем столе. Поскольку сборки пока не подписаны, macOS Gatekeeper и Windows SmartScreen могут показать предупреждение при первом запуске.
+
+Начиная с Beta 3, приложение проверяет GitHub Releases вскоре после запуска, а затем раз в 24 часа. Отметка последней успешной проверки исключает лишние запросы при частых перезапусках. Между проверками отдельный фоновый цикл не работает. Скачивание новой версии начинается только после согласия пользователя; после проверки SHA-256 программа отдельно спрашивает разрешение на установку. В Windows новая версия устанавливается поверх существующей копии. В macOS helper временно сохраняет старую `.app`, заменяет её новой и возвращает предыдущую копию при сбое. Beta 2 нужно один раз обновить вручную до Beta 3; следующие версии можно будет устанавливать из приложения.
 
 Проект находится на стадии beta. Перед стабильным релизом ещё нужна проверка полного цикла через реальный Google Drive на физических компьютерах. В одну связку входят два устройства; одновременная публикация с них не поддерживается. Сначала примените последнюю версию на одном компьютере, затем публикуйте изменения со второго.
 

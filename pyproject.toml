@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-handoff"
-version = "0.2.0b2"
+version = "0.2.0b3"
 description = "Secure bidirectional Codex state synchronization, encrypted backup, and restore"
 readme = "README.md"
 requires-python = ">=3.11"
