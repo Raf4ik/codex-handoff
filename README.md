@@ -6,6 +6,19 @@ Codex Handoff is a free, open-source desktop application. It synchronizes select
 
 Codex Handoff is an independent community project and is not affiliated with or endorsed by OpenAI.
 
+## Supported Pairings
+
+One configured synchronization space connects exactly two active computers. The computers may use any supported combination:
+
+| Direction | Example |
+| --- | --- |
+| macOS → Windows | MacBook to a Windows laptop or desktop |
+| Windows → macOS | Windows laptop or desktop back to a Mac |
+| Windows → Windows | Windows laptop to a replacement Windows PC |
+| macOS → macOS | One MacBook to a new MacBook |
+
+The arrows describe the current publish direction; the same pair can synchronize back in the opposite direction. This is multi-platform synchronization for a two-device pair, not a three-way merge service. Before publishing, the active computer must apply the latest version from the other computer.
+
 ## Screenshots
 
 ### Synchronization Dashboard
@@ -91,6 +104,14 @@ Install Codex Handoff on the second computer and configure it with:
 The second device discovers the protected baseline and published versions in the shared application folder. It first downloads and applies the latest version, or restores the protected baseline when no version has been published yet. Until that first initialization succeeds, publishing is disabled so a new computer cannot overwrite the shared state with its empty or unrelated local files.
 
 The encrypted baseline is cached in the application data directory on both devices. It remains available for recovery on either computer even if the cloud connection is temporarily unavailable.
+
+### Pairing flow inside the application
+
+1. On the first computer, choose the Codex directory, storage provider, and recovery key, then create the protected baseline.
+2. On the second or replacement computer, use the same storage, Google account, OAuth JSON, and recovery key. Give it a different device name.
+3. The dashboard detects whether this is a new pair member. If a current version exists, it offers a preview before applying it. If only the baseline exists, it offers **Initialize from baseline**.
+4. The **Sync to cloud** action remains disabled until initialization succeeds. This prevents an empty or unrelated new profile from replacing the pair's state.
+5. After initialization, work on either computer, close Codex, publish, and apply the update on the other computer. Each device keeps its own encrypted local baseline copy.
 
 ### Replace a computer
 

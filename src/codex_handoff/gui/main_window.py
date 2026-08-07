@@ -538,7 +538,7 @@ class MainWindow(QMainWindow):
         )
         has_baseline = bool(baseline_id)
         if self.pending_operation is None:
-            self.baseline_button.setEnabled(not has_baseline)
+            self.baseline_button.setEnabled(not has_baseline and self.config.pair_mode == "create_pair")
             self.push_button.setEnabled(can_publish)
             self.restore_baseline_button.setEnabled(has_baseline)
             if requires_initial_sync:
