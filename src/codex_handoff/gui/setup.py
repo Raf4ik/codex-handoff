@@ -163,6 +163,47 @@ class RecoveryPage(QWidget):
         self.recovery_key.setText(selected)
 
 
+class PairingPage(QWidget):
+    def __init__(self, existing: AppConfig | None) -> None:
+        super().__init__()
+        self.mode = QComboBox()
+        self.mode.addItem("Create a new two-device pair", "create_pair")
+        self.mode.addItem("Join an existing pair", "join_pair")
+        if existing:
+            index = self.mode.findData(existing.pair_mode)
+            if index >= 0:
+                self.mode.setCurrentIndex(index)
+        self.explanation = QLabel()
+        self.explanation.setWordWrap(True)
+        self.explanation.setObjectName("reviewSummary")
+        self.mode.currentIndexChanged.connect(self._update_explanation)
+        body = _page_body(
+            "PAIRING",
+            "Connect two computers",
+            "Choose whether this computer starts a pair or joins one that already has a protected baseline.",
+        )
+        form = QFormLayout()
+        form.addRow("Pairing mode", self.mode)
+        body.addLayout(form)
+        body.addSpacing(12)
+        body.addWidget(self.explanation)
+        body.addStretch()
+        self.setLayout(body)
+        self._update_explanation()
+
+    def _update_explanation(self) -> None:
+        if self.mode.currentData() == "join_pair":
+            self.explanation.setText(
+                "Use Join when replacing a Windows laptop, adding a Windows desktop, or moving to a new Mac. "
+                "After setup, the dashboard will initialize this computer from the latest version or the protected baseline."
+            )
+        else:
+            self.explanation.setText(
+                "Create a new pair on the first computer. The second computer uses Join with the same storage and recovery key. "
+                "Supported directions: macOS -> Windows, Windows -> macOS, Windows -> Windows, and macOS -> macOS."
+            )
+
+
 class ReviewPage(QWidget):
     def __init__(self, existing: AppConfig | None) -> None:
         super().__init__()
@@ -196,10 +237,11 @@ class SetupWizard(QDialog):
         self.resize(900, 600)
         self.device_page = DevicePage(self.existing)
         self.storage_page = StoragePage(self.existing)
+        self.pairing_page = PairingPage(self.existing)
         self.recovery_page = RecoveryPage(self.existing)
         self.review_page = ReviewPage(self.existing)
         self.pages = QStackedWidget()
-        for page in (self.device_page, self.storage_page, self.recovery_page, self.review_page):
+        for page in (self.device_page, self.storage_page, self.pairing_page, self.recovery_page, self.review_page):
             self.pages.addWidget(page)
         self.step_labels: list[QLabel] = []
         rail = self._build_rail()
@@ -250,7 +292,7 @@ class SetupWizard(QDialog):
         brand_row.addStretch()
         layout.addLayout(brand_row)
         layout.addSpacing(36)
-        for number, title in enumerate(("This device", "Storage", "Recovery key", "Review"), start=1):
+        for number, title in enumerate(("This device", "Storage", "Pairing", "Recovery key", "Review"), start=1):
             label = QLabel(f"  {number}    {title}")
             label.setFixedHeight(42)
             label.setProperty("step", "pending")
@@ -269,6 +311,7 @@ class SetupWizard(QDialog):
         self.provider = self.storage_page.provider
         self.storage = self.storage_page.storage
         self.secrets = self.storage_page.secrets
+        self.pair_mode = self.pairing_page.mode
         self.recovery_key = self.recovery_page.recovery_key
         self.storage_row = self.storage_page.storage_row
         self.secrets_row = self.storage_page.secrets_row
@@ -280,8 +323,8 @@ class SetupWizard(QDialog):
             label.style().unpolish(label)
             label.style().polish(label)
         self.back_button.setVisible(index > 0)
-        self.continue_button.setText("Finish setup" if index == 3 else "Continue")
-        if index == 3:
+        self.continue_button.setText("Finish setup" if index == 4 else "Continue")
+        if index == 4:
             self._update_review()
 
     def _back(self) -> None:
@@ -292,7 +335,7 @@ class SetupWizard(QDialog):
         if error:
             QMessageBox.warning(self, "Check this step", error)
             return
-        if self.current_step < 3:
+        if self.current_step < 4:
             self._show_step(self.current_step + 1)
         else:
             self._finish()
@@ -308,7 +351,7 @@ class SetupWizard(QDialog):
                 return "Select the Google Desktop OAuth JSON file."
             if self.provider.currentData() == "local" and not self.storage.text().strip():
                 return "Select a local provider folder."
-        elif self.current_step == 2 and not Path(self.recovery_key.text()).expanduser().is_file():
+        elif self.current_step == 3 and not Path(self.recovery_key.text()).expanduser().is_file():
             return "Create or select the recovery key."
         return None
 
@@ -317,6 +360,7 @@ class SetupWizard(QDialog):
             device_id=self.device.text().strip(),
             source_dir=Path(self.source.text()).expanduser(),
             workspace_dir=Path(self.workspace.text()).expanduser(),
+            pair_mode=str(self.pair_mode.currentData()),
             provider=str(self.provider.currentData()),
             local_storage_dir=Path(self.storage.text()).expanduser() if self.provider.currentData() == "local" else None,
             google_client_secrets=Path(self.secrets.text()).expanduser() if self.provider.currentData() == "google_drive" else None,
@@ -332,6 +376,7 @@ class SetupWizard(QDialog):
         provider = "Google Drive" if self.provider.currentData() == "google_drive" else "Local folder"
         self.review_page.summary.setText(
             f"Device: {self.device.text()}\n"
+            f"Pairing: {'Join existing pair' if self.pair_mode.currentData() == 'join_pair' else 'Create new pair'}\n"
             f"Codex data: {self.source.text()}\n"
             f"Storage: {provider}\n"
             f"Recovery key: {self.recovery_key.text()}"

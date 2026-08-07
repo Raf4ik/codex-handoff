@@ -8,17 +8,17 @@ The storage provider contains immutable version artifacts and a small mutable `h
 
 ## Device State
 
-Each device keeps its own state outside the synced profile:
+Each of the two paired devices keeps its own state outside the synced profile:
 
 ```json
 {"device_id":"macbook","last_applied_version":"v...","baseline_id":"b..."}
 ```
 
-Before pushing, the client compares the remote head with its `last_applied_version`. If another device published a version since this device last pulled it, push stops with a stale-device error. The user must apply the current cloud update before publishing the next synchronization snapshot.
+Before pushing, the client compares the remote head with its `last_applied_version`. A newly configured device has no state file and cannot push. It must first apply the current head or restore the protected baseline. If the other paired device published a version since this device last pulled it, push stops with a stale-device error. The user must apply the current cloud update before publishing the next synchronization snapshot.
 
 ## Immutable Baseline
 
-The first baseline is written once under `baseline/<baseline_id>/`. Creating a baseline when one already exists is an error. Restore, pruning, and normal sync do not delete or alter baseline files. Re-baselining is a separate explicit operation that creates a new baseline ID and archives the old one.
+The first baseline is written once under `baseline/<baseline_id>/`. Creating a baseline when one already exists is an error. The encrypted baseline is cached in the application data directory on both paired devices after creation or first synchronization. Restore, pruning, and normal sync do not delete or alter baseline files. Re-baselining is a separate explicit operation that creates a new baseline ID and archives the old one.
 
 ## Apply and Restore
 

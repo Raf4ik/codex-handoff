@@ -86,3 +86,49 @@ def test_main_window_keeps_background_workers_alive(tmp_path: Path, monkeypatch)
     assert window.statusBar().currentMessage() == "Ready"
     window.close()
     window.pool.waitForDone(1000)
+
+
+def test_new_device_dashboard_requires_baseline_initialization(tmp_path: Path, monkeypatch) -> None:
+    app = QApplication.instance() or QApplication([])
+    source = tmp_path / "codex"
+    (source / "sessions").mkdir(parents=True)
+    key = generate_recovery_key(tmp_path / "recovery.key")
+    config_path = tmp_path / "config.json"
+    save_config(
+        AppConfig(
+            device_id="new-macbook",
+            source_dir=source,
+            workspace_dir=tmp_path / "workspace",
+            provider="local",
+            local_storage_dir=tmp_path / "storage",
+            encryption_key_file=key,
+        ),
+        config_path,
+    )
+    monkeypatch.setattr("codex_handoff.service.is_codex_running", lambda: False)
+    window = MainWindow(config_path)
+    window.pool.waitForDone(3000)
+
+    window._show_status(
+        (
+            {
+                "device_id": "new-macbook",
+                "baseline_id": "baseline-1",
+                "last_applied_version": None,
+                "remote_head": None,
+                "remote_source": None,
+                "update_available": False,
+                "requires_initial_sync": True,
+                "can_publish": False,
+                "codex_running": False,
+            },
+            [],
+        )
+    )
+
+    assert not window.push_button.isEnabled()
+    assert window.pull_button.isEnabled()
+    assert window.pull_button.text() == "Initialize from baseline"
+    assert "new device" in window.operation_banner.message.text().lower()
+    window.close()
+    window.pool.waitForDone(1000)

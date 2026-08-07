@@ -20,6 +20,11 @@ def new_identifier(prefix: str) -> str:
     return f"{prefix}-{timestamp}-{uuid.uuid4().hex[:12]}"
 
 
+def source_platform() -> str | None:
+    detected = platform.system().lower()
+    return {"darwin": "macos", "windows": "windows"}.get(detected, detected or None)
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -60,7 +65,7 @@ def build_artifact(
         profile=profile.name,
         created_at=datetime.now(timezone.utc).isoformat(),
         files=entries,
-        source_platform=platform.system().lower() or None,
+        source_platform=source_platform(),
     )
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:

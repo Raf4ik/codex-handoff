@@ -93,9 +93,10 @@ class SyncRoute(QWidget):
         super().__init__(parent)
         self.local = _Endpoint("This device")
         self.cloud = _Endpoint("Storage")
-        self.remote = _Endpoint("Other device")
+        self.remote = _Endpoint("Latest source")
         self.local_title = self.local.title
         self.local_detail = self.local.detail
+        self.remote_title = self.remote.title
         self.remote_detail = self.remote.detail
         first_arrow = QLabel("->")
         second_arrow = QLabel("->")
@@ -123,9 +124,9 @@ class SyncRoute(QWidget):
         self.local.detail.setText(local_device)
         self.cloud.title.setText(provider)
         self.cloud.detail.setText("Encrypted versions")
-        remote_names = {"windows": "Windows PC", "macos": "Mac"}
-        self.remote.title.setText(remote_names.get(remote_platform or "", "Other device"))
-        self.remote.detail.setText(remote_device or "Not connected")
+        remote_names = {"windows": "Windows", "macos": "macOS"}
+        self.remote.title.setText(remote_names.get(remote_platform or "", "Latest source"))
+        self.remote.detail.setText(remote_device or "No published versions")
 
 
 class VersionTable(QTableWidget):
