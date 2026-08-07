@@ -4,6 +4,13 @@
 
 Beta 4 hardens the Windows in-app update path introduced in Beta 3.
 
+### Included synchronization workflow
+
+- One configured pair contains exactly two active devices and supports macOS → Windows, Windows → macOS, Windows → Windows, and macOS → macOS.
+- Synchronization is bidirectional and user-controlled through Google Drive: Codex must be closed before publishing, applying, or restoring data.
+- Each device keeps its own protected parent baseline. The application never overwrites that baseline and creates a local encrypted backup before applying or restoring data.
+- English remains the default interface language; Russian can be selected during setup or later in Settings.
+
 ### Windows update reliability
 
 - A successful in-app update now relaunches the newly installed Windows application explicitly.
@@ -24,11 +31,18 @@ The builds remain unsigned beta artifacts. macOS Gatekeeper and Windows SmartScr
 
 Beta 4 повышает надёжность встроенного обновления Windows, появившегося в Beta 3.
 
+### Реализованный процесс синхронизации
+
+- Одна настроенная связка включает ровно два активных устройства и поддерживает macOS → Windows, Windows → macOS, Windows → Windows и macOS → macOS.
+- Двусторонняя синхронизация через Google Drive выполняется только под контролем пользователя: перед публикацией, применением или восстановлением данных Codex должен быть закрыт.
+- На каждом устройстве хранится собственная защищённая родительская копия. Приложение никогда её не перезаписывает и создаёт локальную зашифрованную резервную копию перед применением или восстановлением данных.
+- Английский остаётся основным языком интерфейса; русский можно выбрать при настройке или позже в разделе «Настройки».
+
 ### Надёжность обновления Windows
 
 - После успешного обновления установщик явно запускает новую версию приложения Windows.
 - Используются прежние App ID и каталог установки, поэтому новая версия заменяет старую, а не создаёт вторую копию.
-- Workflow проверяет полный сценарий: установку, запуск, обновление работающей копии поверх текущей, автоматический перезапуск и очистку после удаления.
+- Сценарий сборки проверяет полный путь: установку, запуск, обновление работающей копии поверх текущей, автоматический перезапуск и очистку после удаления.
 - Конфигурация, ключи восстановления, защищённые родительские копии, версии синхронизации и локальные резервные копии остаются вне каталога установки.
 
 ### Согласие на обновление
@@ -38,4 +52,4 @@ Beta 4 повышает надёжность встроенного обновл
 - После проверки SHA-256 приложение отдельно спрашивает разрешение на установку.
 - Beta 3 может найти Beta 4 через встроенный механизм обновления. Для Beta 2 и более старых версий текущий релиз нужно один раз установить вручную.
 
-Сборки остаются неподписанными beta-артефактами. При первом запуске macOS Gatekeeper и Windows SmartScreen могут показать предупреждение. Отдельную офлайн-копию ключа восстановления нужно хранить в безопасном месте.
+Сборки остаются неподписанными и тестовыми. При первом запуске macOS Gatekeeper и Windows SmartScreen могут показать предупреждение. Отдельную офлайн-копию ключа восстановления нужно хранить в безопасном месте.
