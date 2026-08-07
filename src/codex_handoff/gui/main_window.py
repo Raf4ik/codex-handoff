@@ -138,6 +138,8 @@ class MainWindow(QMainWindow):
         self.workers: set[Worker] = set()
         self.last_notified_version: str | None = None
         self.pending_operation: tuple[object, object] | None = None
+        self.requires_initial_sync = False
+        self.remote_update_available = False
         self._quitting = False
         self.setWindowTitle("Codex Handoff")
         self.setWindowIcon(load_app_icon())
@@ -515,9 +517,18 @@ class MainWindow(QMainWindow):
         self.local_label.setText(str(status["last_applied_version"] or "None"))
         self.remote_label.setText(str(status["remote_head"] or "None"))
         update_available = bool(status["update_available"])
+        requires_initial_sync = bool(status.get("requires_initial_sync"))
+        can_publish = bool(status.get("can_publish"))
+        self.requires_initial_sync = requires_initial_sync
+        self.remote_update_available = update_available
         self.update_label.setText("Available" if update_available else "Up to date")
+        if requires_initial_sync:
+            self.update_label.setText("Initial sync required")
         self.preview_button.setEnabled(update_available)
-        self.pull_button.setEnabled(update_available)
+        self.pull_button.setText(
+            "Initialize from baseline" if requires_initial_sync and not update_available else "Sync from cloud"
+        )
+        self.pull_button.setEnabled(update_available or requires_initial_sync)
         self.route.set_route(
             self.platform.local_label,
             str(status["device_id"]),
@@ -528,8 +539,17 @@ class MainWindow(QMainWindow):
         has_baseline = bool(baseline_id)
         if self.pending_operation is None:
             self.baseline_button.setEnabled(not has_baseline)
-            self.push_button.setEnabled(has_baseline)
+            self.push_button.setEnabled(can_publish)
             self.restore_baseline_button.setEnabled(has_baseline)
+            if requires_initial_sync:
+                instruction = (
+                    "This is a new device. Review and apply the latest cloud version before publishing."
+                    if update_available
+                    else "This is a new device. Initialize it from the protected baseline before publishing."
+                )
+                self.operation_banner.show_message(instruction, StatusTone.WARNING)
+            elif self.operation_banner.isVisible():
+                self.operation_banner.hide()
         self.versions.set_versions(versions)
         self.recent_versions.set_versions(versions[:3])
         if self.monitor:
@@ -571,6 +591,9 @@ class MainWindow(QMainWindow):
 
     def _pull(self) -> None:
         if self.service is not None:
+            if self.requires_initial_sync and not self.remote_update_available:
+                self._restore_baseline()
+                return
             self._run(self.service.preview_pull, self._confirm_pull)
 
     def build_preview_dialog(self, preview: ApplyPreview) -> UpdatePreviewDialog:

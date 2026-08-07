@@ -10,6 +10,10 @@ class StaleDeviceError(HandoffError):
     pass
 
 
+class DeviceNotInitializedError(HandoffError):
+    pass
+
+
 class VersionNotFoundError(HandoffError):
     pass
 

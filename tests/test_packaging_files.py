@@ -13,8 +13,8 @@ def test_windows_installer_is_per_user_and_creates_system_entries() -> None:
     assert "CurrentVersion\\Run" in script
     assert "uninsdeletevalue" in script
     assert "CodexHandoff-Windows-x64-Setup" in script
-    assert "VersionInfoVersion=0.2.0.1" in script
-    assert "VersionInfoProductVersion=0.2.0.1" in script
+    assert "VersionInfoVersion=0.2.0.2" in script
+    assert "VersionInfoProductVersion=0.2.0.2" in script
     assert "VersionInfoProductVersion={#MyAppVersion}" not in script
 
 
@@ -48,7 +48,7 @@ def test_macos_dmg_contains_applications_alias_and_icon() -> None:
 def test_tagged_release_contains_only_installers_and_checksums() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-build.yml").read_text(encoding="utf-8")
 
-    assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.1.md" in workflow
+    assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.2.md" in workflow
     assert "prerelease: true" in workflow
     assert "release-assets/CodexHandoff-macOS-arm64.dmg" in workflow
     assert "release-assets/CodexHandoff-Windows-x64-Setup.exe" in workflow

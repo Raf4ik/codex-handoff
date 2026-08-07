@@ -35,6 +35,7 @@ def test_sync_route_uses_platform_specific_local_label() -> None:
 
     assert route.local_title.text() == "This PC"
     assert route.local_detail.text() == "DESKTOP-01"
+    assert route.remote_title.text() == "macOS"
     assert route.remote_detail.text() == "MacBook"
     route.close()
     assert app is not None

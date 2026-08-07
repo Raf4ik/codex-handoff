@@ -76,6 +76,16 @@ def test_manifest_without_source_platform_remains_readable(tmp_path: Path) -> No
     assert loaded.source_platform is None
 
 
+def test_macos_source_platform_uses_cross_platform_protocol_name(tmp_path: Path, monkeypatch) -> None:
+    source = state(tmp_path / "source", "source")
+    artifact = tmp_path / "snapshot.zip"
+    monkeypatch.setattr("codex_handoff.artifacts.platform.system", lambda: "Darwin")
+
+    manifest = build_artifact(source, artifact, version_id="v1", parent_version=None, device_id="mac")
+
+    assert manifest.source_platform == "macos"
+
+
 def test_artifact_rejects_path_traversal(tmp_path: Path) -> None:
     artifact = tmp_path / "unsafe.zip"
     with zipfile.ZipFile(artifact, "w") as archive:

@@ -16,7 +16,7 @@ The macOS DMG contains `CodexHandoff.app` and an `Applications` alias. Drag the 
 
 ## GitHub Actions
 
-Run **Desktop builds** manually from the Actions tab to test both platform packages. Pushing a version tag such as `v0.2.0-beta.1` builds the same artifacts, performs platform smoke tests, generates `SHA256SUMS`, and publishes a GitHub prerelease using the bilingual release notes in the repository.
+Run **Desktop builds** manually from the Actions tab to test both platform packages. Pushing a version tag such as `v0.2.0-beta.2` builds the same artifacts, performs platform smoke tests, generates `SHA256SUMS`, and publishes a GitHub prerelease using the bilingual release notes in the repository.
 
 The macOS job verifies the Apple Silicon runner architecture, app icon metadata, app startup, and mounted DMG contents. The Windows job silently installs the Setup package, verifies the executable, shortcuts, autostart registry value, and uninstaller, starts the installed application in background mode, uninstalls it, and verifies cleanup.
 
@@ -69,4 +69,4 @@ The output is `dist\CodexHandoff-Windows-x64-Setup.exe`. A portable executable i
 
 The public workflow creates unsigned artifacts. They are functional, but macOS Gatekeeper and Windows SmartScreen may warn on first launch. Removing these warnings for general distribution requires an Apple Developer Program membership with Developer ID signing and notarization, plus a Windows Authenticode code-signing certificate. Those paid credentials are not included in this free open-source project.
 
-Unsigned package testing is still meaningful, but the beta should not be called stable until a person completes a real Windows install/uninstall, macOS drag-install/Desktop alias check, and Google Drive macOS-to-Windows-to-macOS synchronization cycle.
+Unsigned package testing is still meaningful, but the beta should not be called stable until a person completes a real Windows install/uninstall, macOS drag-install/Desktop alias check, and a real Google Drive two-device cycle for at least one supported OS pairing.

@@ -7,7 +7,7 @@ from pathlib import Path
 from .artifacts import apply_artifact, build_artifact, new_identifier, preview_artifact, read_manifest, verify_artifact
 from .config import AppConfig, validate_config
 from .crypto import decrypt_file, encrypt_file, load_recovery_key
-from .exceptions import BaselineExistsError, CodexRunningError, StaleDeviceError
+from .exceptions import BaselineExistsError, CodexRunningError, DeviceNotInitializedError, StaleDeviceError
 from .models import ApplyPreview, DeviceState, RemoteHead, SnapshotManifest
 from .processes import is_codex_running
 from .providers.base import StorageProvider
@@ -22,6 +22,7 @@ class HandoffService:
         assert self.config.encryption_key_file is not None
         self.key = load_recovery_key(self.config.encryption_key_file)
         (self.config.workspace_dir / "artifacts").mkdir(exist_ok=True)
+        (self.config.workspace_dir / "baselines").mkdir(exist_ok=True)
         (self.config.workspace_dir / "backups").mkdir(exist_ok=True)
         (self.config.workspace_dir / "staging").mkdir(exist_ok=True)
 
@@ -45,13 +46,19 @@ class HandoffService:
     def status(self) -> dict[str, object]:
         state = self._state()
         head = self.provider.read_head()
+        initialized = self.config.state_path.is_file()
+        update_available = bool(head and head.version_id != state.last_applied_version)
+        local_baseline_available = bool(state.baseline_id and self._baseline_cache_path(state.baseline_id).is_file())
         return {
             "device_id": state.device_id,
             "baseline_id": state.baseline_id or None,
             "last_applied_version": state.last_applied_version,
             "remote_head": head.version_id if head else None,
             "remote_source": head.source_device if head else None,
-            "update_available": bool(head and head.version_id != state.last_applied_version),
+            "update_available": update_available,
+            "requires_initial_sync": bool(state.baseline_id and not initialized),
+            "can_publish": bool(state.baseline_id and initialized and not update_available),
+            "local_baseline_available": local_baseline_available,
             "codex_running": is_codex_running(),
         }
 
@@ -75,6 +82,7 @@ class HandoffService:
         encrypt_file(plain, artifact, self.key)
         plain.unlink(missing_ok=True)
         self.provider.upload_baseline(artifact, manifest)
+        self._cache_baseline(manifest.version_id, artifact)
         state = self._state()
         self._save_state(DeviceState(state.device_id, identifier, state.last_applied_version))
         return manifest
@@ -84,6 +92,10 @@ class HandoffService:
         state = self._state()
         if not state.baseline_id:
             raise BaselineExistsError("Create or connect to a protected baseline first")
+        if not self.config.state_path.is_file():
+            raise DeviceNotInitializedError(
+                "This is a new device. Sync from cloud or restore the protected baseline before publishing."
+            )
         remote = self.provider.read_head()
         remote_id = remote.version_id if remote else None
         if remote_id != state.last_applied_version:
@@ -122,6 +134,32 @@ class HandoffService:
         verify_artifact(destination)
         return destination
 
+    def _baseline_cache_path(self, baseline_id: str) -> Path:
+        return self.config.workspace_dir / "baselines" / f"{baseline_id}.chandoff"
+
+    def _cache_baseline(self, baseline_id: str, source: Path | None = None) -> Path:
+        destination = self._baseline_cache_path(baseline_id)
+        if destination.is_file():
+            return destination
+        if source is None:
+            self.provider.download_artifact(baseline_id, destination)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+        return destination
+
+    def _cache_remote_baseline(self) -> None:
+        baseline_ids = self.provider.baseline_ids()
+        if baseline_ids:
+            self._cache_baseline(baseline_ids[0])
+
+    def _prepare_cached_baseline(self, baseline_id: str) -> Path:
+        encrypted = self._cache_baseline(baseline_id)
+        destination = self.config.workspace_dir / "staging" / f"{baseline_id}.zip"
+        decrypt_file(encrypted, destination, self.key)
+        verify_artifact(destination)
+        return destination
+
     def preview_pull(self) -> ApplyPreview | None:
         head = self.provider.read_head()
         if head is None or head.version_id == self._state().last_applied_version:
@@ -148,8 +186,10 @@ class HandoffService:
         head = self.provider.read_head()
         state = self._state()
         if head is None or head.version_id == state.last_applied_version:
+            self._cache_remote_baseline()
             return None
         artifact = self._download(head.version_id)
+        self._cache_remote_baseline()
         backup = self._backup_current()
         try:
             manifest = apply_artifact(artifact, self.config.source_dir, self.config.workspace_dir / "staging")
@@ -164,16 +204,26 @@ class HandoffService:
 
     def restore(self, artifact_id: str) -> SnapshotManifest:
         self._require_stopped()
-        artifact = self._download(artifact_id)
+        was_initialized = self.config.state_path.is_file()
+        if artifact_id in self.provider.baseline_ids() or self._baseline_cache_path(artifact_id).is_file():
+            artifact = self._prepare_cached_baseline(artifact_id)
+        else:
+            artifact = self._download(artifact_id)
         backup = self._backup_current()
         try:
-            return apply_artifact(artifact, self.config.source_dir, self.config.workspace_dir / "staging")
+            manifest = apply_artifact(artifact, self.config.source_dir, self.config.workspace_dir / "staging")
         except Exception:
             backup_plain = self.config.workspace_dir / "staging" / "rollback.zip"
             decrypt_file(backup, backup_plain, self.key)
             apply_artifact(backup_plain, self.config.source_dir, self.config.workspace_dir / "staging")
             backup_plain.unlink(missing_ok=True)
             raise
+        if not was_initialized:
+            state = self._state()
+            head = self.provider.read_head()
+            applied_head = artifact_id if head and head.version_id == artifact_id else None
+            self._save_state(DeviceState(self.config.device_id, state.baseline_id, applied_head))
+        return manifest
 
     def list_versions(self) -> list[RemoteHead]:
         return self.provider.list_versions()

@@ -97,4 +97,4 @@ class LocalProvider:
                     raw.get("source_platform"),
                 )
             )
-        return result
+        return sorted(result, key=lambda item: item.created_at, reverse=True)
