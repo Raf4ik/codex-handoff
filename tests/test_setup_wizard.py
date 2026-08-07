@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from codex_handoff.gui.setup import SetupWizard
@@ -16,6 +17,7 @@ def test_setup_wizard_starts_with_platform_defaults(tmp_path: Path) -> None:
     assert wizard.review_page.autostart.isChecked()
     assert wizard.review_page.desktop_shortcut.isChecked()
     assert wizard.minimumWidth() >= 840
+    assert wizard.windowFlags() & Qt.WindowType.WindowMinimizeButtonHint
     wizard.close()
     assert app is not None
 

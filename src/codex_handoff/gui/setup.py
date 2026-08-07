@@ -232,6 +232,8 @@ class SetupWizard(QDialog):
         super().__init__()
         self.config_path = config_path
         self.existing = load_config(config_path) if config_path.is_file() else None
+        self.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, True)
         self.setWindowTitle("Codex Handoff Setup")
         self.setMinimumSize(840, 560)
         self.resize(900, 600)

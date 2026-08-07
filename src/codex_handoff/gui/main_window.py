@@ -141,6 +141,8 @@ class MainWindow(QMainWindow):
         self.requires_initial_sync = False
         self.remote_update_available = False
         self._quitting = False
+        self.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, True)
         self.setWindowTitle("Codex Handoff")
         self.setWindowIcon(load_app_icon())
         self.setMinimumSize(960, 680)
