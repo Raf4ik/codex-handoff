@@ -1,0 +1,41 @@
+# Codex Handoff v0.2.0 Beta 4
+
+## English
+
+Beta 4 hardens the Windows in-app update path introduced in Beta 3.
+
+### Windows update reliability
+
+- A successful in-app update now relaunches the newly installed Windows application explicitly.
+- The installer uses the existing App ID and installation directory, so the previous version is replaced rather than duplicated.
+- The packaging workflow verifies the complete sequence: install, launch, update the running copy in place, automatic relaunch, and uninstall cleanup.
+- Configuration, recovery keys, protected baselines, synchronization versions, and local backups remain outside the installation directory.
+
+### Update consent
+
+- Background checks download only public release metadata and run at most once every 24 hours after a successful check.
+- Downloading an installer requires explicit user confirmation.
+- Installation requires a separate confirmation after SHA-256 verification.
+- Beta 3 can discover Beta 4 through its built-in updater. Beta 2 and older versions require one manual installation of the current release.
+
+The builds remain unsigned beta artifacts. macOS Gatekeeper and Windows SmartScreen may warn on first launch. Keep an offline copy of the recovery key.
+
+## Русский
+
+Beta 4 повышает надёжность встроенного обновления Windows, появившегося в Beta 3.
+
+### Надёжность обновления Windows
+
+- После успешного обновления установщик явно запускает новую версию приложения Windows.
+- Используются прежние App ID и каталог установки, поэтому новая версия заменяет старую, а не создаёт вторую копию.
+- Workflow проверяет полный сценарий: установку, запуск, обновление работающей копии поверх текущей, автоматический перезапуск и очистку после удаления.
+- Конфигурация, ключи восстановления, защищённые родительские копии, версии синхронизации и локальные резервные копии остаются вне каталога установки.
+
+### Согласие на обновление
+
+- Фоновая проверка получает только общедоступные метаданные релиза и после успешного запроса выполняется не чаще одного раза в 24 часа.
+- Для скачивания установщика требуется явное согласие пользователя.
+- После проверки SHA-256 приложение отдельно спрашивает разрешение на установку.
+- Beta 3 может найти Beta 4 через встроенный механизм обновления. Для Beta 2 и более старых версий текущий релиз нужно один раз установить вручную.
+
+Сборки остаются неподписанными beta-артефактами. При первом запуске macOS Gatekeeper и Windows SmartScreen могут показать предупреждение. Отдельную офлайн-копию ключа восстановления нужно хранить в безопасном месте.

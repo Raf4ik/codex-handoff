@@ -16,7 +16,7 @@ The macOS DMG contains `CodexHandoff.app` and an `Applications` alias. Drag the 
 
 ## GitHub Actions
 
-Run **Desktop builds** manually from the Actions tab to test both platform packages. Pushing a version tag such as `v0.2.0-beta.3` builds the same artifacts, performs platform smoke tests, generates `SHA256SUMS`, and publishes a GitHub prerelease using the bilingual release notes in the repository.
+Run **Desktop builds** manually from the Actions tab to test both platform packages. Pushing a version tag such as `v0.2.0-beta.4` builds the same artifacts, performs platform smoke tests, generates `SHA256SUMS`, and publishes a GitHub prerelease using the bilingual release notes in the repository.
 
 The macOS job verifies the Apple Silicon runner architecture, app icon metadata, app startup, and mounted DMG contents. The Windows job silently installs the Setup package, verifies the executable, shortcuts, autostart registry value, and uninstaller, starts the installed application, updates that running installation in place, launches the updated copy, uninstalls it, and verifies cleanup.
 

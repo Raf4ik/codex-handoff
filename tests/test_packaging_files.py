@@ -13,9 +13,11 @@ def test_windows_installer_is_per_user_and_creates_system_entries() -> None:
     assert "CurrentVersion\\Run" in script
     assert "uninsdeletevalue" in script
     assert "CodexHandoff-Windows-x64-Setup" in script
-    assert "VersionInfoVersion=0.2.0.3" in script
-    assert "VersionInfoProductVersion=0.2.0.3" in script
+    assert "VersionInfoVersion=0.2.0.4" in script
+    assert "VersionInfoProductVersion=0.2.0.4" in script
     assert "VersionInfoProductVersion={#MyAppVersion}" not in script
+    assert "Check: IsUpdateMode" in script
+    assert "{param:UPDATE|0}" in script
 
 
 def test_windows_workflow_builds_installer_not_portable_executable() -> None:
@@ -48,8 +50,10 @@ def test_macos_dmg_contains_applications_alias_and_icon() -> None:
 def test_tagged_release_contains_only_installers_and_checksums() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-build.yml").read_text(encoding="utf-8")
 
-    assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.3.md" in workflow
+    assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.4.md" in workflow
     assert "In-place update did not close the running application" in workflow
+    assert "Updated application did not relaunch automatically" in workflow
+    assert "'/UPDATE=1'" in workflow
     assert "prerelease: true" in workflow
     assert "release-assets/CodexHandoff-macOS-arm64.dmg" in workflow
     assert "release-assets/CodexHandoff-Windows-x64-Setup.exe" in workflow

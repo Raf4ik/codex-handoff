@@ -189,7 +189,8 @@ def launch_update(
                 "/SILENT",
                 "/CURRENTUSER",
                 "/CLOSEAPPLICATIONS",
-                "/RESTARTAPPLICATIONS",
+                "/NORESTARTAPPLICATIONS",
+                "/UPDATE=1",
             ],
             close_fds=True,
         )

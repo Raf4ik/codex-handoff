@@ -1,5 +1,5 @@
 #define MyAppName "Codex Handoff"
-#define MyAppVersion "0.2.0-beta.3"
+#define MyAppVersion "0.2.0-beta.4"
 #define MyAppPublisher "Codex Handoff contributors"
 #define MyAppExeName "CodexHandoff.exe"
 
@@ -21,11 +21,11 @@ SolidCompression=yes
 WizardStyle=modern
 OutputDir=..\dist
 OutputBaseFilename=CodexHandoff-Windows-x64-Setup
-VersionInfoVersion=0.2.0.3
+VersionInfoVersion=0.2.0.4
 VersionInfoDescription=Secure bidirectional Codex state synchronization
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion=0.2.0.3
+VersionInfoProductVersion=0.2.0.4
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
@@ -43,3 +43,10 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Codex Handoff"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifdoesntexist; Check: IsUpdateMode
+
+[Code]
+function IsUpdateMode: Boolean;
+begin
+  Result := WizardSilent and (CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0);
+end;

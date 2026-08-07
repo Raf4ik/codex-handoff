@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(0, 2, 0, 3),
-    prodvers=(0, 2, 0, 3),
+    filevers=(0, 2, 0, 4),
+    prodvers=(0, 2, 0, 4),
     mask=0x3F,
     flags=0x0,
     OS=0x40004,
@@ -16,11 +16,11 @@ VSVersionInfo(
         [
           StringStruct(u'CompanyName', u'Codex Handoff contributors'),
           StringStruct(u'FileDescription', u'Secure bidirectional Codex state synchronization'),
-          StringStruct(u'FileVersion', u'0.2.0-beta.3'),
+          StringStruct(u'FileVersion', u'0.2.0-beta.4'),
           StringStruct(u'InternalName', u'CodexHandoff'),
           StringStruct(u'OriginalFilename', u'CodexHandoff.exe'),
           StringStruct(u'ProductName', u'Codex Handoff'),
-          StringStruct(u'ProductVersion', u'0.2.0-beta.3'),
+          StringStruct(u'ProductVersion', u'0.2.0-beta.4'),
         ],
       )
     ]),
