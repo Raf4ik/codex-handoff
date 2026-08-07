@@ -207,9 +207,7 @@ Routine background polling must use a provider method that locates only `head.js
 
 ## Windows Distribution
 
-The release provides two clearly named artifacts.
-
-### Installer
+The release provides one Windows artifact so users cannot confuse a portable executable with an installer.
 
 `CodexHandoff-Windows-x64-Setup.exe` is the recommended download. Inno Setup packages a PyInstaller onedir application and:
 
@@ -220,10 +218,6 @@ The release provides two clearly named artifacts.
 - enables per-user autostart by default;
 - optionally launches Codex Handoff after installation;
 - supports clean uninstall while retaining user snapshots, keys, and configuration unless the user explicitly chooses data removal in a future feature.
-
-### Portable Build
-
-`CodexHandoff-Windows-x64-Portable.exe` remains available as an explicitly labeled optional one-file executable. It does not install, create shortcuts, or register an uninstaller.
 
 ## macOS Distribution
 
@@ -276,7 +270,6 @@ No existing recovery key or encrypted artifact format is invalidated.
 - Windows installer compilation with Inno Setup;
 - silent installer smoke test in a disposable CI user environment;
 - installed executable, Start menu entry, desktop shortcut, autostart entry, and uninstaller existence;
-- portable executable launch smoke test;
 - macOS `.app` launch smoke test and bundle icon validation;
 - DMG contents include `.app` and Applications alias;
 - SHA-256 checksums for all release files.
@@ -290,11 +283,10 @@ Publish a new prerelease `v0.2.0-beta.1`; do not replace or mutate the previous 
 Release assets:
 
 - `CodexHandoff-Windows-x64-Setup.exe`;
-- `CodexHandoff-Windows-x64-Portable.exe`;
 - `CodexHandoff-macOS-arm64.dmg`;
 - `SHA256SUMS`.
 
-The release notes distinguish the recommended installer from the portable executable and state that all builds remain unsigned.
+The release notes state clearly that the Windows file is an installer, explain the desktop shortcut and autostart behavior, and note that both builds remain unsigned.
 
 ## Acceptance Criteria
 
