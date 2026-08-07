@@ -6,6 +6,16 @@ Codex Handoff is a free, open-source desktop application. It synchronizes select
 
 Codex Handoff is an independent community project and is not affiliated with or endorsed by OpenAI.
 
+## Screenshots
+
+### Synchronization Dashboard
+
+![Codex Handoff synchronization dashboard](docs/images/dashboard.png)
+
+### First-Time Setup
+
+![Codex Handoff first-time setup wizard](docs/images/setup-wizard.png)
+
 ## Why It Exists
 
 Codex stores useful working state locally. Copying its entire data directory between computers is unsafe: it can include authentication data, machine-specific settings, caches, locks, temporary files, and databases that may still be in use.
