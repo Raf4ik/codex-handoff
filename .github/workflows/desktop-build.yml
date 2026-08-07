@@ -103,11 +103,10 @@ jobs:
           if (Test-Path $app) { throw "Application files remain after uninstall" }
           if (Test-Path $desktopShortcut) { throw "Desktop shortcut remains after uninstall" }
           if (Test-Path $startShortcut) { throw "Start menu shortcut remains after uninstall" }
-          $runValueAfterUninstall = Get-ItemPropertyValue `
+          $runProperties = Get-ItemProperty `
             'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
-            'Codex Handoff' `
             -ErrorAction SilentlyContinue
-          if ($null -ne $runValueAfterUninstall) { throw "Autostart entry remains after uninstall" }
+          if ($null -ne $runProperties.'Codex Handoff') { throw "Autostart entry remains after uninstall" }
       - uses: actions/upload-artifact@v4
         with:
           name: CodexHandoff-Windows-x64-Setup
