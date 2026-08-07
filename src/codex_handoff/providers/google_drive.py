@@ -81,6 +81,17 @@ class GoogleDriveProvider:
             if not page_token:
                 return result
 
+    def _find_named_file(self, name: str) -> dict | None:
+        escaped = name.replace("\\", "\\\\").replace("'", "\\'")
+        query = f"'{self.folder_id}' in parents and name='{escaped}' and trashed=false"
+        response = self.service.files().list(
+            q=query,
+            spaces="drive",
+            fields="files(id,name,createdTime,appProperties)",
+            pageSize=10,
+        ).execute()
+        return next((item for item in response.get("files", []) if item.get("name") == name), None)
+
     def baseline_ids(self) -> list[str]:
         return sorted(
             path["name"][:-4]
@@ -132,7 +143,7 @@ class GoogleDriveProvider:
                 _, done = downloader.next_chunk()
 
     def _head_file(self) -> dict | None:
-        return next((item for item in self._files() if item.get("name") == "head.json"), None)
+        return self._find_named_file("head.json")
 
     def read_head(self) -> RemoteHead | None:
         match = self._head_file()

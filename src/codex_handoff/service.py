@@ -55,6 +55,9 @@ class HandoffService:
             "codex_running": is_codex_running(),
         }
 
+    def remote_head(self) -> RemoteHead | None:
+        return self.provider.read_head()
+
     def create_baseline(self) -> SnapshotManifest:
         self._require_stopped()
         if self.provider.baseline_ids():
