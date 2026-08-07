@@ -11,3 +11,4 @@ dist-lite/
 *.egg-info/
 *.spec
 .DS_Store
+.superpowers/
