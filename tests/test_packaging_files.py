@@ -13,6 +13,9 @@ def test_windows_installer_is_per_user_and_creates_system_entries() -> None:
     assert "CurrentVersion\\Run" in script
     assert "uninsdeletevalue" in script
     assert "CodexHandoff-Windows-x64-Setup" in script
+    assert "VersionInfoVersion=0.2.0.1" in script
+    assert "VersionInfoProductVersion=0.2.0.1" in script
+    assert "VersionInfoProductVersion={#MyAppVersion}" not in script
 
 
 def test_windows_workflow_builds_installer_not_portable_executable() -> None:

@@ -25,7 +25,7 @@ VersionInfoVersion=0.2.0.1
 VersionInfoDescription=Secure bidirectional Codex state synchronization
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductVersion=0.2.0.1
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
