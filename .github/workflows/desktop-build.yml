@@ -13,8 +13,8 @@ jobs:
   macos:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           architecture: arm64
@@ -49,7 +49,7 @@ jobs:
           test -d "$mount_point/CodexHandoff.app"
           test -L "$mount_point/Applications"
           hdiutil detach "$mount_point"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: CodexHandoff-macOS-arm64
           path: dist/CodexHandoff-macOS-arm64.dmg
@@ -57,8 +57,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           architecture: x64
@@ -114,7 +114,7 @@ jobs:
             'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
             -ErrorAction SilentlyContinue
           if ($null -ne $runProperties.'Codex Handoff') { throw "Autostart entry remains after uninstall" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: CodexHandoff-Windows-x64-Setup
           path: dist/CodexHandoff-Windows-x64-Setup.exe
@@ -124,12 +124,12 @@ jobs:
     needs: [macos, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: CodexHandoff-macOS-arm64
           path: release-assets
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: CodexHandoff-Windows-x64-Setup
           path: release-assets
