@@ -55,6 +55,9 @@ class HandoffService:
             "codex_running": is_codex_running(),
         }
 
+    def remote_head(self) -> RemoteHead | None:
+        return self.provider.read_head()
+
     def create_baseline(self) -> SnapshotManifest:
         self._require_stopped()
         if self.provider.baseline_ids():
@@ -100,7 +103,13 @@ class HandoffService:
         encrypt_file(plain, artifact, self.key)
         plain.unlink(missing_ok=True)
         self.provider.upload_version(artifact, manifest)
-        head = RemoteHead(identifier, remote_id, self.config.device_id, manifest.created_at)
+        head = RemoteHead(
+            identifier,
+            remote_id,
+            self.config.device_id,
+            manifest.created_at,
+            manifest.source_platform,
+        )
         self.provider.update_head(remote_id, head)
         self._save_state(DeviceState(state.device_id, state.baseline_id, identifier))
         return manifest

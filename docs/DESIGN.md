@@ -30,8 +30,8 @@ Google Drive is not a transactional database, so simultaneous publication remain
 
 ## GUI
 
-The first-run screen collects device name, Codex state path, provider, local storage path or Google OAuth client file, recovery key, and local workspace path. The main view shows Codex process state, current remote version, last applied version, protected baseline, and recent versions. It polls for updates every 30 seconds and displays a system notification without accepting anything automatically. Destructive actions always show a preview and confirmation. A confirmed operation waits while Codex is running and starts when the process closes; the user can cancel the waiting operation.
+The four-step first-run wizard collects the device name, platform-specific Codex state path, provider, local storage path or Google OAuth client file, recovery key, integration preferences, and local workspace path. The dashboard shows Codex process state, current remote version, last applied version, protected baseline, version history, recovery, and settings. Its lightweight remote-head monitor checks every 60 seconds and uses 2/5/15-minute backoff after failures. It displays a system notification without accepting anything automatically. Destructive actions always show the Added, Changed, Removed, and Unchanged preview before confirmation. A confirmed operation waits while Codex is running and starts when the process closes; the user can cancel the waiting operation.
 
 ## Distribution
 
-Development runs from Python 3.11+. The desktop build workflow provides `CodexHandoff-macOS-arm64.dmg` and `CodexHandoff-Windows-x64.exe`, with Python and Qt bundled. Unsigned builds may trigger operating-system warnings. See `docs/BUILDING.md`.
+Development runs from Python 3.11+. The desktop build workflow provides `CodexHandoff-macOS-arm64.dmg` and the per-user `CodexHandoff-Windows-x64-Setup.exe`, with Python and Qt bundled. The packages use the approved application icon and create platform-native Desktop entries and user autostart. Unsigned builds may trigger operating-system warnings. See `docs/BUILDING.md`.

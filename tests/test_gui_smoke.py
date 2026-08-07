@@ -6,6 +6,21 @@ from PySide6.QtWidgets import QApplication
 from codex_handoff.config import AppConfig, save_config
 from codex_handoff.crypto import generate_recovery_key
 from codex_handoff.gui.app import MainWindow, SetupDialog
+from codex_handoff.gui.theme import app_icon_path, load_app_icon
+
+
+def test_app_icon_path_resolves_packaged_png() -> None:
+    icon_path = app_icon_path()
+
+    assert icon_path.exists()
+    assert icon_path.name == "codex-handoff.png"
+
+
+def test_load_app_icon_returns_non_null_icon() -> None:
+    app = QApplication.instance() or QApplication([])
+
+    assert not load_app_icon().isNull()
+    assert app is not None
 
 
 def test_setup_dialog_constructs(tmp_path: Path) -> None:
@@ -67,6 +82,7 @@ def test_main_window_keeps_background_workers_alive(tmp_path: Path, monkeypatch)
 
     assert window.service is not None
     assert window.device_label.text() == "macbook"
+    assert window.route.local_title.text() in {"This PC", "This Mac", "This device"}
     assert window.statusBar().currentMessage() == "Ready"
     window.close()
     window.pool.waitForDone(1000)

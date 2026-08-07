@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from codex_handoff.config import AppConfig
+from codex_handoff.config import AppConfig, load_config, save_config
 
 
 def config(tmp_path: Path, client_secrets: Path) -> AppConfig:
@@ -25,3 +25,30 @@ def test_google_token_path_is_bound_to_oauth_client(tmp_path: Path) -> None:
     first_path = config(tmp_path, first).token_path
     assert first_path == config(tmp_path, copy).token_path
     assert first_path != config(tmp_path, second).token_path
+
+
+def test_saved_legacy_fields_load_desktop_defaults(tmp_path: Path) -> None:
+    source = tmp_path / "codex"
+    source.mkdir()
+    key = tmp_path / "recovery.key"
+    key.write_bytes(b"x")
+    config_path = tmp_path / "config.json"
+    save_config(
+        AppConfig(
+            device_id="device",
+            source_dir=source,
+            workspace_dir=tmp_path / "workspace",
+            provider="local",
+            local_storage_dir=tmp_path / "storage",
+            encryption_key_file=key,
+        ),
+        config_path,
+    )
+
+    loaded = load_config(config_path)
+
+    assert loaded.monitoring_enabled is True
+    assert loaded.poll_interval_seconds == 60
+    assert loaded.autostart_enabled is True
+    assert loaded.minimize_to_tray is True
+    assert loaded.close_notice_seen is False

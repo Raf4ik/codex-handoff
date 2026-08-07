@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Codex Handoff synchronization icon concept</title>
+  <desc id="desc">Two colored synchronization arrows circle a protected version snapshot.</desc>
+  <defs>
+    <marker id="arrow-teal" markerWidth="132" markerHeight="132" refX="104" refY="66" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M8 8L118 66L8 124Z" fill="#50D6C7"/>
+    </marker>
+    <marker id="arrow-coral" markerWidth="132" markerHeight="132" refX="104" refY="66" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M8 8L118 66L8 124Z" fill="#FF7A66"/>
+    </marker>
+  </defs>
+
+  <rect x="48" y="48" width="928" height="928" rx="224" fill="#17252A"/>
+  <rect x="70" y="70" width="884" height="884" rx="204" fill="none" stroke="#33444A" stroke-width="6"/>
+
+  <path d="M218 470C255 290 414 178 588 196C700 207 795 262 846 352"
+        fill="none" stroke="#50D6C7" stroke-width="84" stroke-linecap="round"
+        marker-end="url(#arrow-teal)"/>
+  <path d="M806 554C769 734 610 846 436 828C324 817 229 762 178 672"
+        fill="none" stroke="#FF7A66" stroke-width="84" stroke-linecap="round"
+        marker-end="url(#arrow-coral)"/>
+
+  <rect x="386" y="386" width="252" height="252" rx="68" fill="#F7F8F3"/>
+  <rect x="442" y="448" width="140" height="30" rx="15" fill="#25343A"/>
+  <rect x="442" y="505" width="140" height="30" rx="15" fill="#25343A"/>
+  <rect x="442" y="562" width="86" height="30" rx="15" fill="#25343A"/>
+  <circle cx="578" cy="577" r="27" fill="#F4C95D"/>
+</svg>

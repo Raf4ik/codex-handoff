@@ -34,8 +34,10 @@ class Downloader:
 class Files:
     def __init__(self):
         self.items: list[dict] = []
+        self.queries: list[str] = []
 
     def list(self, **kwargs):
+        self.queries.append(kwargs.get("q", ""))
         return Request({"files": [{key: value for key, value in item.items() if key != "data"} for item in self.items]})
 
     def create(self, body, media_body=None, fields=None):
@@ -82,3 +84,16 @@ def test_google_drive_provider_upload_head_list_and_download(tmp_path: Path, mon
     destination = tmp_path / "download.chandoff"
     provider.download_artifact("version-1", destination)
     assert destination.read_bytes() == b"encrypted"
+
+
+def test_read_head_uses_exact_named_file_query(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("codex_handoff.providers.google_drive.MediaIoBaseDownload", Downloader)
+    provider = GoogleDriveProvider.__new__(GoogleDriveProvider)
+    provider.service = Service()
+    provider.folder_id = provider._ensure_folder()
+    provider.service.resource.queries.clear()
+
+    assert provider.read_head() is None
+
+    assert len(provider.service.resource.queries) == 1
+    assert "name='head.json'" in provider.service.resource.queries[0]

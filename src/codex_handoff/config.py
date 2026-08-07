@@ -19,6 +19,11 @@ class AppConfig:
     local_storage_dir: Path | None = None
     google_client_secrets: Path | None = None
     encryption_key_file: Path | None = None
+    monitoring_enabled: bool = True
+    poll_interval_seconds: int = 60
+    autostart_enabled: bool = True
+    minimize_to_tray: bool = True
+    close_notice_seen: bool = False
 
     @property
     def state_path(self) -> Path:
@@ -70,6 +75,11 @@ def load_config(path: Path | None = None) -> AppConfig:
         local_storage_dir=Path(raw["local_storage_dir"]).expanduser() if raw.get("local_storage_dir") else None,
         google_client_secrets=Path(raw["google_client_secrets"]).expanduser() if raw.get("google_client_secrets") else None,
         encryption_key_file=Path(raw["encryption_key_file"]).expanduser() if raw.get("encryption_key_file") else None,
+        monitoring_enabled=bool(raw.get("monitoring_enabled", True)),
+        poll_interval_seconds=int(raw.get("poll_interval_seconds", 60)),
+        autostart_enabled=bool(raw.get("autostart_enabled", True)),
+        minimize_to_tray=bool(raw.get("minimize_to_tray", True)),
+        close_notice_seen=bool(raw.get("close_notice_seen", False)),
     )
 
 
@@ -86,5 +96,7 @@ def validate_config(config: AppConfig) -> None:
         raise ConfigurationError("Google OAuth client secrets JSON is required")
     if config.provider not in {"local", "google_drive"}:
         raise ConfigurationError(f"Unsupported provider: {config.provider}")
+    if config.poll_interval_seconds < 30:
+        raise ConfigurationError("Update check interval must be at least 30 seconds")
     if config.encryption_key_file is None or not config.encryption_key_file.is_file():
         raise ConfigurationError("Encryption recovery key file is required")

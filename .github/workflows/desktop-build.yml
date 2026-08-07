@@ -24,14 +24,31 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[packaging]"
+          python packaging/build_icons.py
+          iconutil -c icns build/icons/CodexHandoff.iconset -o build/icons/CodexHandoff.icns
           python -m PyInstaller --noconfirm --clean --windowed \
             --name CodexHandoff \
             --osx-bundle-identifier com.codexhandoff.desktop \
+            --icon build/icons/CodexHandoff.icns \
+            --collect-data codex_handoff \
             --collect-submodules googleapiclient \
             --collect-submodules google_auth_oauthlib \
             packaging/codex_handoff_gui.py
-          hdiutil create -volname CodexHandoff -srcfolder dist/CodexHandoff.app \
-            -ov -format UDZO dist/CodexHandoff-macOS-arm64.dmg
+          test -f dist/CodexHandoff.app/Contents/Resources/CodexHandoff.icns
+          defaults read "$PWD/dist/CodexHandoff.app/Contents/Info" CFBundleIconFile | grep CodexHandoff
+          packaging/macos-dmg.sh
+      - name: Smoke test macOS app and disk image
+        run: |
+          QT_QPA_PLATFORM=offscreen dist/CodexHandoff.app/Contents/MacOS/CodexHandoff --background &
+          app_pid=$!
+          sleep 5
+          kill -0 "$app_pid"
+          kill "$app_pid"
+          mount_point="$(mktemp -d)"
+          hdiutil attach dist/CodexHandoff-macOS-arm64.dmg -nobrowse -mountpoint "$mount_point"
+          test -d "$mount_point/CodexHandoff.app"
+          test -L "$mount_point/Applications"
+          hdiutil detach "$mount_point"
       - uses: actions/upload-artifact@v4
         with:
           name: CodexHandoff-macOS-arm64
@@ -45,31 +62,80 @@ jobs:
         with:
           python-version: "3.12"
           architecture: x64
-      - name: Build Windows executable
+      - name: Build Windows application and installer
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[packaging]"
+          python packaging/build_icons.py
           python -m PyInstaller --noconfirm --clean --windowed `
             --name CodexHandoff `
+            --onedir `
+            --icon build/icons/codex-handoff.ico `
+            --version-file packaging/windows-version-info.txt `
+            --collect-data codex_handoff `
             --collect-submodules googleapiclient `
             --collect-submodules google_auth_oauthlib `
-            --onefile packaging/codex_handoff_gui.py
-          Rename-Item dist/CodexHandoff.exe CodexHandoff-Windows-x64.exe
+            packaging/codex_handoff_gui.py
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging/codex-handoff.iss
+      - name: Smoke test Windows installer
+        shell: pwsh
+        run: |
+          $installer = Resolve-Path "dist/CodexHandoff-Windows-x64-Setup.exe"
+          Start-Process $installer -ArgumentList '/VERYSILENT','/CURRENTUSER','/TASKS="desktopicon,autostart"' -Wait
+          $installDir = Join-Path $env:LOCALAPPDATA 'Programs\Codex Handoff'
+          $app = Join-Path $installDir 'CodexHandoff.exe'
+          $desktopShortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Codex Handoff.lnk'
+          $startShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Codex Handoff.lnk'
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          if (-not (Test-Path $app)) { throw "Installed executable not found" }
+          if (-not (Test-Path $desktopShortcut)) { throw "Desktop shortcut not found" }
+          if (-not (Test-Path $startShortcut)) { throw "Start menu shortcut not found" }
+          if (-not (Test-Path $uninstaller)) { throw "Uninstaller not found" }
+          $runValue = Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' 'Codex Handoff'
+          if ($runValue -notmatch 'CodexHandoff.exe') { throw "Autostart entry is invalid" }
+          $process = Start-Process $app -ArgumentList '--background' -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) { throw "Installed application exited during smoke test" }
+          Stop-Process -Id $process.Id -Force
+          Start-Process $uninstaller -ArgumentList '/VERYSILENT' -Wait
+          if (Test-Path $app) { throw "Application files remain after uninstall" }
+          if (Test-Path $desktopShortcut) { throw "Desktop shortcut remains after uninstall" }
+          if (Test-Path $startShortcut) { throw "Start menu shortcut remains after uninstall" }
+          $runValueAfterUninstall = Get-ItemPropertyValue `
+            'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
+            'Codex Handoff' `
+            -ErrorAction SilentlyContinue
+          if ($null -ne $runValueAfterUninstall) { throw "Autostart entry remains after uninstall" }
       - uses: actions/upload-artifact@v4
         with:
-          name: CodexHandoff-Windows-x64
-          path: dist/CodexHandoff-Windows-x64.exe
+          name: CodexHandoff-Windows-x64-Setup
+          path: dist/CodexHandoff-Windows-x64-Setup.exe
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [macos, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          name: CodexHandoff-macOS-arm64
           path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: CodexHandoff-Windows-x64-Setup
+          path: release-assets
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          sha256sum CodexHandoff-macOS-arm64.dmg CodexHandoff-Windows-x64-Setup.exe > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/**/*
-          generate_release_notes: true
+          body_path: docs/RELEASE_NOTES_v0.2.0-beta.1.md
+          prerelease: true
+          files: |
+            release-assets/CodexHandoff-macOS-arm64.dmg
+            release-assets/CodexHandoff-Windows-x64-Setup.exe
+            release-assets/SHA256SUMS
