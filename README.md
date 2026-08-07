@@ -287,7 +287,7 @@ These limitations are why the current release is marked as a prerelease rather t
 - [x] Restore preview, pre-apply backup, and rollback
 - [x] macOS and Windows GUI source
 - [x] Automated unsigned `.dmg` and Windows Setup installer with shortcuts, autostart, and uninstall
-- [ ] Real macOS-to-Windows-to-Mac Google Drive release validation
+- [ ] Real Google Drive two-device validation for every supported operating-system pairing
 - [ ] Verified project-wide Google OAuth distribution flow
 - [ ] Signed and notarized stable installers
 
