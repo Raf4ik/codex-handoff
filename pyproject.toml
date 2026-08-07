@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "codex-handoff"
 version = "0.1.0b1"
-description = "Secure cross-platform Codex state sync, backup, restore, and handoff"
+description = "Secure bidirectional Codex state synchronization, encrypted backup, and restore"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

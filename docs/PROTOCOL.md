@@ -2,7 +2,7 @@
 
 ## Versioned State
 
-The storage provider contains immutable versions under `versions/<version_id>/` and a small mutable `head.json`. A version manifest records its parent version, source device, profile, and every copied file's size and SHA-256 digest. A version directory is published by staging it completely and then atomically moving it into the immutable namespace.
+The storage provider contains immutable version artifacts and a small mutable `head.json`. A version manifest records its parent version, source device, profile, and every synchronized file's size and SHA-256 digest. A version is uploaded and verified before `head.json` is updated to make it discoverable by other devices.
 
 `head.json` only points to the latest published version. Clients never infer ownership from filesystem modification time.
 
@@ -14,7 +14,7 @@ Each device keeps its own state outside the synced profile:
 {"device_id":"macbook","last_applied_version":"v...","baseline_id":"b..."}
 ```
 
-Before pushing, the client compares the remote head with its `last_applied_version`. If another device published a version since this device last pulled it, push stops with a stale-device error. The user must pull first or explicitly start a new handoff.
+Before pushing, the client compares the remote head with its `last_applied_version`. If another device published a version since this device last pulled it, push stops with a stale-device error. The user must apply the current cloud update before publishing the next synchronization snapshot.
 
 ## Immutable Baseline
 
@@ -30,4 +30,4 @@ Profiles are allowlists, not a copy of the entire `.codex` directory. They may i
 
 ## Cloud Providers
 
-The core depends on a narrow provider interface. The local filesystem provider is the reference implementation and test oracle. Google Drive will implement the same operations using OAuth and resumable uploads; no provider is allowed to weaken version immutability or stale-device checks.
+The core depends on a narrow provider interface. The local filesystem provider is the reference implementation and test oracle. The Google Drive provider implements the same operations using OAuth and resumable uploads; no provider is allowed to weaken version immutability or stale-device checks.

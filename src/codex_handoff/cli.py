@@ -10,14 +10,14 @@ from .service import HandoffService, create_provider
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="codex-handoff", description="Secure Codex state handoff")
+    parser = argparse.ArgumentParser(prog="codex-handoff", description="Secure bidirectional Codex state synchronization")
     parser.add_argument("--config", type=Path, help="Configuration JSON path")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("gui", help="Open the desktop interface")
     sub.add_parser("status", help="Show local and remote state")
     sub.add_parser("baseline", help="Create the protected parent baseline")
-    sub.add_parser("push", help="Publish this device state")
-    sub.add_parser("pull", help="Apply the current remote version")
+    sub.add_parser("push", help="Publish this device's synchronization snapshot")
+    sub.add_parser("pull", help="Apply the current synchronization update")
     sub.add_parser("versions", help="List remote versions")
     restore = sub.add_parser("restore", help="Restore a version or baseline")
     restore.add_argument("artifact_id")
