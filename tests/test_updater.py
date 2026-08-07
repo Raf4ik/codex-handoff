@@ -102,7 +102,8 @@ def test_windows_update_runs_installer_in_place(tmp_path: Path) -> None:
 
     assert calls[0][0][0] == str(package)
     assert "/CLOSEAPPLICATIONS" in calls[0][0]
-    assert "/RESTARTAPPLICATIONS" in calls[0][0]
+    assert "/NORESTARTAPPLICATIONS" in calls[0][0]
+    assert "/UPDATE=1" in calls[0][0]
 
 
 def test_macos_update_creates_detached_replacement_helper(tmp_path: Path) -> None:
