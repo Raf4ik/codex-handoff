@@ -142,7 +142,7 @@ jobs:
         run: |
           cd release-assets
           sha256sum CodexHandoff-macOS-arm64.dmg CodexHandoff-Windows-x64-Setup.exe > SHA256SUMS
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           body_path: docs/RELEASE_NOTES_v0.2.0-beta.4.md
           prerelease: true
