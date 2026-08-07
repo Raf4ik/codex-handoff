@@ -9,6 +9,19 @@ class VisibleFlag:
         self.visible = value
 
 
+class Banner:
+    def __init__(self) -> None:
+        self.visible = False
+        self.message = ""
+
+    def show_message(self, message: str, *args, **kwargs) -> None:
+        self.message = message
+        self.visible = True
+
+    def hide(self) -> None:
+        self.visible = False
+
+
 class Status:
     def __init__(self) -> None:
         self.message = ""
@@ -21,6 +34,7 @@ class WindowDouble:
     def __init__(self) -> None:
         self.pending_operation = None
         self.cancel_wait_button = VisibleFlag()
+        self.operation_banner = Banner()
         self.status = Status()
         self.busy = False
         self.started = []
@@ -40,12 +54,12 @@ def test_confirmed_operation_waits_for_codex_then_runs(monkeypatch) -> None:
     operation = object()
     completed = object()
     running = iter((True, True, False))
-    monkeypatch.setattr(app, "is_codex_running", lambda: next(running))
-    monkeypatch.setattr(app.QMessageBox, "warning", lambda *args: None)
+    monkeypatch.setattr("codex_handoff.gui.main_window.is_codex_running", lambda: next(running))
+    monkeypatch.setattr("codex_handoff.gui.main_window.QMessageBox.warning", lambda *args: None)
 
     app.MainWindow._run_when_codex_stopped(window, operation, completed)
     assert window.pending_operation == (operation, completed)
-    assert window.cancel_wait_button.visible is True
+    assert window.operation_banner.visible is True
     assert window.busy is True
 
     app.MainWindow._try_pending_operation(window)
@@ -53,4 +67,4 @@ def test_confirmed_operation_waits_for_codex_then_runs(monkeypatch) -> None:
     app.MainWindow._try_pending_operation(window)
     assert window.started == [(operation, completed)]
     assert window.pending_operation is None
-    assert window.cancel_wait_button.visible is False
+    assert window.operation_banner.visible is False

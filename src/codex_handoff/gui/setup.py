@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from ..config import AppConfig, default_workspace, load_config, save_config, validate_config
 from ..crypto import generate_recovery_key
 from .platform import application_path, create_desktop_shortcut, current_platform, set_autostart
+from .theme import load_app_icon
 from .widgets import ActionButton
 
 
@@ -48,7 +49,7 @@ class DevicePage(QWidget):
         form.addRow("Codex data", _path_row(self.source, directory=True))
         body = _page_body(
             "THIS DEVICE",
-            f"Set up {info.local_label.lower()}",
+            f"Set up {info.local_label}",
             f"{info.display_name} detected. Confirm the Codex data directory.",
         )
         platform_badge = QLabel(f"{info.display_name}  |  DETECTED")
@@ -238,9 +239,16 @@ class SetupWizard(QDialog):
         rail.setFixedWidth(240)
         layout = QVBoxLayout(rail)
         layout.setContentsMargins(24, 28, 24, 24)
+        brand_icon = QLabel()
+        brand_icon.setPixmap(load_app_icon().pixmap(32, 32))
         brand = QLabel("Codex Handoff")
         brand.setObjectName("setupBrand")
-        layout.addWidget(brand)
+        brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(0, 0, 0, 0)
+        brand_row.addWidget(brand_icon)
+        brand_row.addWidget(brand)
+        brand_row.addStretch()
+        layout.addLayout(brand_row)
         layout.addSpacing(36)
         for number, title in enumerate(("This device", "Storage", "Recovery key", "Review"), start=1):
             label = QLabel(f"  {number}    {title}")

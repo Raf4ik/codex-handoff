@@ -82,6 +82,7 @@ def test_main_window_keeps_background_workers_alive(tmp_path: Path, monkeypatch)
 
     assert window.service is not None
     assert window.device_label.text() == "macbook"
+    assert window.route.local_title.text() in {"This PC", "This Mac", "This device"}
     assert window.statusBar().currentMessage() == "Ready"
     window.close()
     window.pool.waitForDone(1000)
