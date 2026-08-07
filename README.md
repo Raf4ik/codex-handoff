@@ -172,7 +172,7 @@ Google Drive can see the application folder, encrypted object names, version ide
 ## Implemented Features
 
 - shared Python synchronization core for macOS and Windows;
-- two-device pairing for macOS ↔ Windows, Windows ↔ Windows, and macOS ↔ macOS;
+- two-device pairing for macOS → Windows, Windows → macOS, Windows → Windows, and macOS → macOS;
 - PySide6 desktop GUI and command-line interface;
 - first-run configuration wizard;
 - Google Drive OAuth and resumable uploads;
@@ -272,12 +272,13 @@ These limitations are why the current release is marked as a prerelease rather t
 
 ## Русская версия
 
-Codex Handoff — бесплатное приложение с открытым исходным кодом для безопасной двусторонней синхронизации выбранного состояния Codex между двумя компьютерами. Устройства могут работать в связках macOS ↔ Windows, Windows ↔ Windows или macOS ↔ macOS. Программа не копирует каталог `.codex` целиком: она собирает только разрешённые для синхронизации данные, создаёт отдельную версию, шифрует её на устройстве и публикует в Google Drive пользователя либо в выбранную локальную папку.
+Codex Handoff — бесплатное приложение с открытым исходным кодом для безопасной двусторонней синхронизации выбранного состояния Codex между двумя компьютерами. Поддерживаются все четыре направления: macOS → Windows, Windows → macOS, Windows → Windows и macOS → macOS. Программа не копирует каталог `.codex` целиком: она собирает только разрешённые для синхронизации данные, создаёт отдельную версию, шифрует её на устройстве и публикует в Google Drive пользователя либо в выбранную локальную папку.
 
 Синхронизация работает в обоих направлениях:
 
 ```text
 macOS -> Google Drive -> Windows
+Windows -> Google Drive -> macOS
 Windows -> Google Drive -> Windows
 macOS -> Google Drive -> macOS
 ```
