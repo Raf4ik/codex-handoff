@@ -20,5 +20,18 @@ cp "$icon" "$stage/.VolumeIcon.icns"
 if command -v SetFile >/dev/null 2>&1; then
   SetFile -a C "$stage"
 fi
-hdiutil create -volname "Codex Handoff" -srcfolder "$stage" \
-  -ov -format UDZO "$destination"
+for attempt in 1 2 3; do
+  if hdiutil create -volname "Codex Handoff" -srcfolder "$stage" \
+    -ov -format UDZO "$destination"; then
+    exit 0
+  fi
+
+  if [[ "$attempt" -eq 3 ]]; then
+    echo "Failed to create disk image after $attempt attempts" >&2
+    exit 1
+  fi
+
+  echo "Disk image creation failed (attempt $attempt); retrying..." >&2
+  rm -f "$destination"
+  sleep 3
+done
