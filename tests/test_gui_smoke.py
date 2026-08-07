@@ -1,6 +1,7 @@
 from pathlib import Path
 import time
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from codex_handoff.config import AppConfig, save_config
@@ -84,6 +85,7 @@ def test_main_window_keeps_background_workers_alive(tmp_path: Path, monkeypatch)
     assert window.device_label.text() == "macbook"
     assert window.route.local_title.text() in {"This PC", "This Mac", "This device"}
     assert window.statusBar().currentMessage() == "Ready"
+    assert window.windowFlags() & Qt.WindowType.WindowMinimizeButtonHint
     window.close()
     window.pool.waitForDone(1000)
 

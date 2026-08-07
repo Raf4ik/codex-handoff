@@ -8,6 +8,7 @@ Beta 2 makes the synchronization model explicitly two-device and independent of 
 
 - New-device onboarding is protected: a replacement computer cannot publish before it has applied the current cloud version or initialized from the protected baseline.
 - The dashboard now explains the initial-sync state and offers **Initialize from baseline** when a pair has no published versions yet.
+- Added native minimize controls to both the setup wizard and the main dashboard on macOS and Windows.
 - The encrypted parent baseline is cached locally on both devices after creation or first synchronization.
 - Either paired device can restore its local baseline copy if the cloud is temporarily unavailable.
 - Added integration coverage for macOS to Windows, Windows to macOS, Windows to Windows, and macOS to macOS pairings, plus replacement-computer onboarding.
@@ -29,6 +30,7 @@ The builds are unsigned beta artifacts. macOS Gatekeeper and Windows SmartScreen
 
 - Новое устройство не может публиковать данные, пока не применит актуальную версию из облака или не инициализируется из защищённой родительской копии.
 - Dashboard показывает состояние первичной синхронизации и предлагает **Initialize from baseline**, если в связке ещё нет опубликованных версий.
+- В мастере настройки и основном окне теперь доступны системные кнопки сворачивания в macOS и Windows.
 - Зашифрованная родительская копия сохраняется локально на обоих устройствах после создания или первой синхронизации.
 - Любое из двух устройств может восстановить локальную копию baseline, если облако временно недоступно.
 - Добавлены интеграционные тесты для направлений macOS → Windows, Windows → macOS, Windows → Windows и macOS → macOS, а также для замены компьютера.
