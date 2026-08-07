@@ -88,5 +88,13 @@ class LocalProvider:
         result: list[RemoteHead] = []
         for path in sorted(self.versions.glob("*.json"), reverse=True):
             raw = json.loads(path.read_text(encoding="utf-8"))
-            result.append(RemoteHead(raw["version_id"], raw.get("parent_version"), raw["source_device"], raw["created_at"]))
+            result.append(
+                RemoteHead(
+                    raw["version_id"],
+                    raw.get("parent_version"),
+                    raw["source_device"],
+                    raw["created_at"],
+                    raw.get("source_platform"),
+                )
+            )
         return result

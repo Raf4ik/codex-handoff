@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 import json
+import platform
 from pathlib import Path, PurePosixPath
 import shutil
 import uuid
@@ -59,6 +60,7 @@ def build_artifact(
         profile=profile.name,
         created_at=datetime.now(timezone.utc).isoformat(),
         files=entries,
+        source_platform=platform.system().lower() or None,
     )
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
@@ -80,6 +82,7 @@ def read_manifest(artifact: Path) -> SnapshotManifest:
         profile=str(raw["profile"]),
         created_at=str(raw["created_at"]),
         files=tuple(FileEntry(str(item["path"]), int(item["size"]), str(item["sha256"])) for item in raw["files"]),
+        source_platform=str(raw["source_platform"]) if raw.get("source_platform") else None,
     )
 
 
@@ -118,7 +121,22 @@ def preview_artifact(artifact: Path, target: Path) -> ApplyPreview:
             unchanged.append(entry.path)
         else:
             changed.append(entry.path)
-    return ApplyPreview(manifest.version_id, manifest.source_device, tuple(added), tuple(changed), tuple(unchanged))
+    snapshot_paths = {entry.path for entry in manifest.files}
+    removed = sorted(
+        current.relative_to(target).as_posix()
+        for current in _portable_files(target, DEFAULT_PROFILE)
+        if current.relative_to(target).as_posix() not in snapshot_paths
+    )
+    return ApplyPreview(
+        manifest.version_id,
+        manifest.source_device,
+        tuple(added),
+        tuple(changed),
+        tuple(unchanged),
+        tuple(removed),
+        manifest.source_platform,
+        manifest.created_at,
+    )
 
 
 def apply_artifact(artifact: Path, target: Path, staging_root: Path) -> SnapshotManifest:

@@ -18,6 +18,7 @@ class SnapshotManifest:
     profile: str
     created_at: str
     files: tuple[FileEntry, ...] = field(default_factory=tuple)
+    source_platform: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,7 @@ class RemoteHead:
     parent_version: str | None
     source_device: str
     created_at: str
+    source_platform: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,3 +51,6 @@ class ApplyPreview:
     added: tuple[str, ...]
     changed: tuple[str, ...]
     unchanged: tuple[str, ...]
+    removed: tuple[str, ...] = field(default_factory=tuple)
+    source_platform: str | None = None
+    created_at: str | None = None

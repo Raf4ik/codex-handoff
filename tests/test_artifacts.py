@@ -1,9 +1,10 @@
 from pathlib import Path
+import json
 import zipfile
 
 import pytest
 
-from codex_handoff.artifacts import apply_artifact, build_artifact, preview_artifact, verify_artifact
+from codex_handoff.artifacts import apply_artifact, build_artifact, preview_artifact, read_manifest, verify_artifact
 from codex_handoff.exceptions import IntegrityError
 
 
@@ -40,6 +41,39 @@ def test_apply_removes_portable_file_absent_from_snapshot(tmp_path: Path) -> Non
     build_artifact(source, artifact, version_id="v1", parent_version=None, device_id="mac")
     apply_artifact(artifact, target, tmp_path / "staging")
     assert not (target / "sessions" / "obsolete.json").exists()
+
+
+def test_preview_reports_removed_portable_file(tmp_path: Path) -> None:
+    source = state(tmp_path / "source", "source")
+    target = state(tmp_path / "target", "target")
+    (target / "sessions" / "obsolete.json").write_text("obsolete", encoding="utf-8")
+    artifact = tmp_path / "snapshot.zip"
+    build_artifact(source, artifact, version_id="v1", parent_version=None, device_id="mac")
+
+    preview = preview_artifact(artifact, target)
+
+    assert preview.removed == ("sessions/obsolete.json",)
+    assert preview.source_platform
+    assert preview.created_at
+
+
+def test_manifest_without_source_platform_remains_readable(tmp_path: Path) -> None:
+    source = state(tmp_path / "source", "source")
+    artifact = tmp_path / "snapshot.zip"
+    expected = build_artifact(source, artifact, version_id="v1", parent_version=None, device_id="old-device")
+    with zipfile.ZipFile(artifact, "r") as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    raw = json.loads(members["manifest.json"])
+    raw.pop("source_platform", None)
+    members["manifest.json"] = (json.dumps(raw) + "\n").encode()
+    with zipfile.ZipFile(artifact, "w") as archive:
+        for name, payload in members.items():
+            archive.writestr(name, payload)
+
+    loaded = read_manifest(artifact)
+
+    assert loaded.version_id == expected.version_id
+    assert loaded.source_platform is None
 
 
 def test_artifact_rejects_path_traversal(tmp_path: Path) -> None:

@@ -111,6 +111,7 @@ class GoogleDriveProvider:
                     "parent_version": manifest.parent_version or "",
                     "source_device": manifest.source_device,
                     "created_at": manifest.created_at,
+                    "source_platform": manifest.source_platform or "",
                 },
             },
             media_body=media,
@@ -176,6 +177,7 @@ class GoogleDriveProvider:
                     parent_version=properties.get("parent_version") or None,
                     source_device=properties.get("source_device", "unknown"),
                     created_at=properties.get("created_at") or item.get("createdTime", ""),
+                    source_platform=properties.get("source_platform") or None,
                 )
             )
         return sorted(result, key=lambda item: item.created_at, reverse=True)
