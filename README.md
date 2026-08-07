@@ -20,7 +20,7 @@ Codex Handoff uses a controlled synchronization process instead:
 - a local backup is created before an update or restore is applied;
 - the original protected baseline cannot be replaced by normal synchronization.
 
-This is near-real-time, user-controlled synchronization rather than silent live file mirroring. While the desktop application is open, it checks the selected storage every 30 seconds and notifies the user about a new version. It never applies a remote update without confirmation.
+This is near-real-time, user-controlled synchronization rather than silent live file mirroring. The desktop application checks the small cloud head record every 60 seconds and notifies the user about a new version. On connection failures it backs off to 2, 5, and then 15 minutes, so background monitoring remains lightweight. It never applies a remote update without confirmation.
 
 ## How Synchronization Works
 
@@ -93,9 +93,9 @@ If Codex is still running after confirmation, Codex Handoff asks the user to clo
 
 ### Apply changes on Windows
 
-1. Keep Codex Handoff open on Windows. It checks for an update every 30 seconds and can display a system notification.
+1. Leave Codex Handoff running in the Windows notification area. It checks for an update every 60 seconds and can display a system notification.
 2. Select **Sync from cloud**.
-3. Review the source device and the number of added and changed files.
+3. Review the source device and the complete Added, Changed, Removed, and Unchanged file lists.
 4. Confirm the update and close Codex if it is running.
 5. The application downloads and decrypts the snapshot, verifies its manifest and SHA-256 hashes, creates a local encrypted backup, stages the files, and applies the version.
 
@@ -155,8 +155,9 @@ Google Drive can see the application folder, encrypted object names, version ide
 - Google Drive OAuth and resumable uploads;
 - local-folder provider for development, testing, or user-managed shared storage;
 - bidirectional versioned synchronization;
-- 30-second update polling and system notifications;
-- update preview and explicit user confirmation;
+- lightweight 60-second update polling with 2/5/15-minute failure backoff;
+- tray/background mode, operating-system autostart, and system notifications;
+- complete Added, Changed, Removed, and Unchanged preview with explicit confirmation;
 - detection of a running Codex process and cancellable waiting;
 - immutable protected baseline and in-app baseline restore;
 - remote version history and selected-version restore;
@@ -165,7 +166,7 @@ Google Drive can see the application folder, encrypted object names, version ide
 - stale-device and concurrent-update checks;
 - cryptographic integrity and archive-path verification;
 - automated tests for snapshots, encryption, providers, process detection, GUI behavior, and the end-to-end local synchronization flow;
-- GitHub Actions builds for Apple Silicon macOS and 64-bit Windows.
+- branded GitHub Actions builds: a DMG for Apple Silicon macOS and a per-user Setup installer for 64-bit Windows.
 
 ## Storage Model
 
@@ -181,12 +182,17 @@ The repository contains a provider interface, so another storage backend can be 
 
 ## Desktop Downloads
 
-The [GitHub Releases](https://github.com/Raf4ik/codex-handoff/releases) page provides unsigned beta builds:
+The [GitHub Releases](https://github.com/Raf4ik/codex-handoff/releases) page provides two unsigned beta installers and a checksum file:
 
 - `CodexHandoff-macOS-arm64.dmg` for Apple Silicon Macs, M1 or newer;
-- `CodexHandoff-Windows-x64.exe` for 64-bit Windows 10 or newer.
+- `CodexHandoff-Windows-x64-Setup.exe` for 64-bit Windows 10 or newer;
+- `SHA256SUMS` for download verification.
 
 Python, Qt, and the required libraries are bundled into both downloads. End users do not install Python separately.
+
+On Windows, run the Setup executable. It installs Codex Handoff for the current user, creates Start menu and Desktop shortcuts, enables background startup by default, and registers an uninstaller in Windows Settings. Uninstalling removes the application, shortcuts, and autostart entry while retaining user configuration, recovery material, and backups.
+
+On macOS, open the DMG and drag `CodexHandoff.app` to the `Applications` alias. Launch the installed copy from Applications. During first-run setup, the enabled Desktop shortcut option creates a Finder alias named `Codex Handoff` on the Desktop. The alias is intentionally created only after the application has been moved out of the mounted DMG.
 
 The builds are currently unsigned. macOS Gatekeeper or Windows SmartScreen may display a warning on first launch. Removing these warnings requires Apple Developer ID notarization and a Windows Authenticode certificate; those paid credentials are not included in this free open-source project. See [desktop builds](docs/BUILDING.md).
 
@@ -221,8 +227,8 @@ Available commands are `gui`, `status`, `baseline`, `push`, `pull`, `versions`, 
 - Users currently provide their own Google Desktop OAuth JSON. A project-wide verified Google consent screen is not bundled yet.
 - Live Google Drive authentication and a full physical Mac-to-Windows-to-Mac cycle still require release-level validation with real user credentials.
 - Google Drive does not provide transactional compare-and-swap. Simultaneous publication from two devices is unsupported; finish synchronization on one device before publishing from another.
-- Update detection works while the desktop application is running and polls every 30 seconds. There is no background system service yet.
-- The update preview currently reports added and changed files by count; it is not a full visual file-diff viewer.
+- Background monitoring runs as the user's tray/menu-bar application, not as a privileged system service. Closing the main window keeps it running when monitoring is enabled; Quit stops it.
+- The preview lists affected paths and categories, but it does not render a line-by-line content diff.
 - The portable profile has been checked against a current macOS Codex directory but still needs validation against a real Windows installation and future Codex versions.
 - The `.dmg` and `.exe` builds are unsigned beta artifacts.
 
@@ -236,7 +242,7 @@ These limitations are why the current release is marked as a prerelease rather t
 - [x] Google Drive and local-folder providers
 - [x] Restore preview, pre-apply backup, and rollback
 - [x] macOS and Windows GUI source
-- [x] Automated unsigned `.dmg` and standalone `.exe`
+- [x] Automated unsigned `.dmg` and Windows Setup installer with shortcuts, autostart, and uninstall
 - [ ] Real macOS-to-Windows-to-Mac Google Drive release validation
 - [ ] Verified project-wide Google OAuth distribution flow
 - [ ] Signed and notarized stable installers
@@ -252,7 +258,7 @@ macOS -> Google Drive -> Windows
 Windows -> Google Drive -> macOS
 ```
 
-Это контролируемая синхронизация, а не незаметное фоновое зеркалирование файлов. Пока приложение открыто, оно проверяет хранилище каждые 30 секунд и сообщает о новой версии. Полученное обновление применяется только после предварительного просмотра и явного подтверждения пользователя.
+Это контролируемая синхронизация, а не незаметное фоновое зеркалирование файлов. Приложение раз в 60 секунд проверяет небольшой указатель актуальной версии в облаке и сообщает об обновлении. При ошибках сети интервал увеличивается до 2, 5 и 15 минут, поэтому фоновый мониторинг не создаёт постоянной заметной нагрузки. Полученное обновление применяется только после предварительного просмотра и явного подтверждения пользователя.
 
 ### Полный путь синхронизации
 
@@ -261,7 +267,7 @@ Windows -> Google Drive -> macOS
 3. После работы в Codex пользователь закрывает его и нажимает **Sync to cloud**.
 4. Программа выбирает только данные безопасного профиля, создаёт снимок с манифестом и SHA-256-хешами, шифрует его с помощью AES-256-GCM и загружает как новую неизменяемую версию.
 5. Приложение на втором устройстве обнаруживает обновление и показывает уведомление.
-6. Пользователь нажимает **Sync from cloud**, видит источник и количество добавленных и изменённых файлов, затем подтверждает применение.
+6. Пользователь нажимает **Sync from cloud**, видит источник и списки добавленных, изменённых, удаляемых и неизменённых файлов, затем подтверждает применение.
 7. Если Codex запущен, приложение ждёт его закрытия. Ожидание можно отменить.
 8. Перед применением создаётся локальная зашифрованная резервная копия текущего состояния.
 9. Загруженный снимок расшифровывается, проверяется и применяется через временный каталог.
@@ -285,9 +291,9 @@ Windows -> Google Drive -> macOS
 
 ### Что уже реализовано
 
-Проект включает общее Python-ядро, CLI, графический интерфейс PySide6, мастер первого запуска, Google Drive OAuth, локальное тестовое хранилище, шифрование AES-256-GCM, проверку целостности, историю версий, уведомления, подтверждение обновлений, ожидание закрытия Codex, защиту от устаревшей публикации, восстановление и автоматические тесты.
+Проект включает общее Python-ядро, CLI, графический интерфейс PySide6, мастер первого запуска, Google Drive OAuth, локальное тестовое хранилище, шифрование AES-256-GCM, проверку целостности, историю версий, уведомления, подтверждение обновлений, ожидание закрытия Codex, защиту от устаревшей публикации, восстановление, работу в области уведомлений, автозапуск и автоматические тесты.
 
-GitHub Actions собирает неподписанные `CodexHandoff-macOS-arm64.dmg` и `CodexHandoff-Windows-x64.exe`. Python уже встроен в оба файла и отдельно пользователю не нужен. Поскольку сборки пока не подписаны, macOS Gatekeeper и Windows SmartScreen могут показать предупреждение при первом запуске.
+GitHub Actions собирает неподписанные `CodexHandoff-macOS-arm64.dmg` и `CodexHandoff-Windows-x64-Setup.exe`. Python уже встроен в обе сборки и отдельно пользователю не нужен. Windows Setup устанавливает программу для текущего пользователя, создаёт ярлыки на рабочем столе и в меню «Пуск», включает автозапуск по умолчанию и добавляет штатное удаление. На macOS пользователь переносит приложение из DMG в Applications, после чего мастер первого запуска создаёт псевдоним Finder на рабочем столе. Поскольку сборки пока не подписаны, macOS Gatekeeper и Windows SmartScreen могут показать предупреждение при первом запуске.
 
 Проект находится на стадии beta. Перед стабильным релизом ещё нужна проверка полного цикла через реальный Google Drive и физические компьютеры Mac и Windows. Одновременная публикация с двух устройств не поддерживается.
 

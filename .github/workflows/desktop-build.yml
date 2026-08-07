@@ -118,10 +118,24 @@ jobs:
     needs: [macos, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          name: CodexHandoff-macOS-arm64
           path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: CodexHandoff-Windows-x64-Setup
+          path: release-assets
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          sha256sum CodexHandoff-macOS-arm64.dmg CodexHandoff-Windows-x64-Setup.exe > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/**/*
-          generate_release_notes: true
+          body_path: docs/RELEASE_NOTES_v0.2.0-beta.1.md
+          prerelease: true
+          files: |
+            release-assets/CodexHandoff-macOS-arm64.dmg
+            release-assets/CodexHandoff-Windows-x64-Setup.exe
+            release-assets/SHA256SUMS

@@ -35,3 +35,14 @@ def test_macos_dmg_contains_applications_alias_and_icon() -> None:
     assert 'CodexHandoff.icns' in workflow
     assert '--icon build/icons/CodexHandoff.icns' in workflow
     assert 'test -L "$mount_point/Applications"' in workflow
+
+
+def test_tagged_release_contains_only_installers_and_checksums() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "desktop-build.yml").read_text(encoding="utf-8")
+
+    assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.1.md" in workflow
+    assert "prerelease: true" in workflow
+    assert "release-assets/CodexHandoff-macOS-arm64.dmg" in workflow
+    assert "release-assets/CodexHandoff-Windows-x64-Setup.exe" in workflow
+    assert "release-assets/SHA256SUMS" in workflow
+    assert "generate_release_notes" not in workflow
