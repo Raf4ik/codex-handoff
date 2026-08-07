@@ -1,4 +1,5 @@
 from codex_handoff.gui import app
+from codex_handoff.gui.i18n import text
 
 
 class VisibleFlag:
@@ -47,6 +48,9 @@ class WindowDouble:
 
     def _run(self, operation, completed) -> None:
         self.started.append((operation, completed))
+
+    def _t(self, key: str, **values: object) -> str:
+        return text("en", key, **values)
 
 
 def test_confirmed_operation_waits_for_codex_then_runs(monkeypatch) -> None:

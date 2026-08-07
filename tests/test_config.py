@@ -48,7 +48,22 @@ def test_saved_legacy_fields_load_desktop_defaults(tmp_path: Path) -> None:
     loaded = load_config(config_path)
 
     assert loaded.monitoring_enabled is True
+    assert loaded.language == "en"
     assert loaded.poll_interval_seconds == 60
     assert loaded.autostart_enabled is True
     assert loaded.minimize_to_tray is True
     assert loaded.close_notice_seen is False
+
+
+def test_language_round_trips_in_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    expected = AppConfig(
+        device_id="device",
+        source_dir=tmp_path / "codex",
+        workspace_dir=tmp_path / "workspace",
+        language="ru",
+    )
+
+    save_config(expected, config_path)
+
+    assert load_config(config_path).language == "ru"

@@ -7,8 +7,10 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, 
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -22,16 +24,20 @@ from PySide6.QtWidgets import (
     QStyle,
     QSystemTrayIcon,
     QTabWidget,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
+from .. import __version__
 from ..config import AppConfig, load_config, save_config
 from ..models import ApplyPreview, RemoteHead
 from ..monitor import RemoteHeadMonitor
 from ..processes import is_codex_running
 from ..service import HandoffService, create_provider
-from .platform import current_platform
+from ..updater import GitHubUpdater, UpdateInfo, is_packaged_application, launch_update
+from .i18n import LANGUAGE_NAMES, normalize_language, text
+from .platform import application_path, current_platform
 from .setup import SetupWizard
 from .theme import CHARCOAL, load_app_icon
 from .widgets import (
@@ -65,40 +71,49 @@ class Worker(QRunnable):
 
 
 class UpdatePreviewDialog(QDialog):
-    def __init__(self, preview: ApplyPreview, parent: QWidget | None = None) -> None:
+    def __init__(self, preview: ApplyPreview, parent: QWidget | None = None, *, language: str = "en") -> None:
         super().__init__(parent)
         self.preview = preview
-        self.setWindowTitle("Review synchronization update")
+        self.language = normalize_language(language)
+        self.setWindowTitle(text(self.language, "preview_window_title"))
         self.setMinimumSize(660, 500)
-        title = QLabel("Review incoming update")
+        title = QLabel(text(self.language, "preview_title"))
         title.setProperty("role", "heading")
         platform_names = {"windows": "Windows", "macos": "macOS"}
         details = QLabel(
-            f"Source: {preview.source_device} ({platform_names.get(preview.source_platform or '', 'Unknown platform')})\n"
-            f"Version: {preview.version_id}\nCreated: {preview.created_at or 'Unknown'}"
+            text(
+                self.language,
+                "preview_details",
+                source=preview.source_device,
+                platform=platform_names.get(preview.source_platform or "", text(self.language, "unknown_platform")),
+                version=preview.version_id,
+                created=preview.created_at or text(self.language, "unknown"),
+            )
         )
         details.setProperty("role", "subtitle")
         counts = QHBoxLayout()
-        added_frame, self.added_count = self._count("Added", len(preview.added), StatusTone.SUCCESS)
-        changed_frame, self.changed_count = self._count("Changed", len(preview.changed), StatusTone.WARNING)
-        removed_frame, self.removed_count = self._count("Removed", len(preview.removed), StatusTone.ERROR)
+        added_frame, self.added_count = self._count(text(self.language, "added"), len(preview.added), StatusTone.SUCCESS)
+        changed_frame, self.changed_count = self._count(text(self.language, "changed"), len(preview.changed), StatusTone.WARNING)
+        removed_frame, self.removed_count = self._count(text(self.language, "removed"), len(preview.removed), StatusTone.ERROR)
         for widget in (added_frame, changed_frame, removed_frame):
             counts.addWidget(widget)
         tabs = QTabWidget()
-        for name, paths in (
-            ("Added", preview.added),
-            ("Changed", preview.changed),
-            ("Removed", preview.removed),
-            ("Unchanged", preview.unchanged),
+        for key, paths in (
+            ("added", preview.added),
+            ("changed", preview.changed),
+            ("removed", preview.removed),
+            ("unchanged", preview.unchanged),
         ):
+            name = text(self.language, key)
             listing = QListWidget()
-            listing.addItems(paths or ("No files",))
+            listing.addItems(paths or (text(self.language, "no_files"),))
             tabs.addTab(listing, f"{name} ({len(paths)})")
-        note = QLabel("Codex must be closed. A local encrypted backup is created before applying this update.")
+        note = QLabel(text(self.language, "preview_note"))
         note.setWordWrap(True)
         note.setObjectName("warningNote")
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Apply | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Apply).setText("Apply update")
+        buttons.button(QDialogButtonBox.StandardButton.Apply).setText(text(self.language, "apply_update"))
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(text(self.language, "cancel"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
@@ -126,16 +141,70 @@ class UpdatePreviewDialog(QDialog):
         return frame, label
 
 
+class ApplicationUpdateDialog(QDialog):
+    def __init__(
+        self,
+        update: UpdateInfo,
+        current_version: str,
+        parent: QWidget | None = None,
+        *,
+        language: str = "en",
+    ) -> None:
+        super().__init__(parent)
+        selected = normalize_language(language)
+        self.setWindowTitle(text(selected, "update_window_title"))
+        self.setMinimumSize(660, 500)
+        title = QLabel(text(selected, "update_available", version=update.version))
+        title.setProperty("role", "heading")
+        details = QLabel(
+            text(
+                selected,
+                "update_version_details",
+                current=current_version,
+                available=update.version,
+            )
+        )
+        details.setProperty("role", "subtitle")
+        notes_label = QLabel(text(selected, "release_notes"))
+        notes_label.setStyleSheet("font-weight: 700;")
+        notes = QTextBrowser()
+        notes.setPlainText(update.notes or update.title)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Apply | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Apply).setText(
+            text(selected, "download_update")
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(text(selected, "cancel"))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(12)
+        layout.addWidget(title)
+        layout.addWidget(details)
+        layout.addWidget(notes_label)
+        layout.addWidget(notes, 1)
+        layout.addWidget(buttons)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, config_path: Path) -> None:
         super().__init__()
         self.config_path = config_path
         self.config = load_config(config_path)
+        self.language = normalize_language(self.config.language)
         self.platform = current_platform()
+        self.updater = (
+            GitHubUpdater(__version__, self.platform.key)
+            if self.platform.key in {"macos", "windows"}
+            else None
+        )
         self.service: HandoffService | None = None
         self.monitor: RemoteHeadMonitor | None = None
         self.pool = QThreadPool.globalInstance()
         self.workers: set[Worker] = set()
+        self.ui_generation = 0
         self.last_notified_version: str | None = None
         self.pending_operation: tuple[object, object] | None = None
         self.requires_initial_sync = False
@@ -153,7 +222,22 @@ class MainWindow(QMainWindow):
         self.codex_wait_timer.setInterval(1000)
         self.codex_wait_timer.timeout.connect(self._try_pending_operation)
         self.codex_wait_timer.start()
+        self.update_timer = QTimer(self)
+        self.update_timer.setInterval(24 * 60 * 60 * 1000)
+        self.update_timer.timeout.connect(lambda: self._check_for_updates(manual=False))
+        self.update_timer.start()
+        if is_packaged_application():
+            QTimer.singleShot(10000, lambda: self._check_for_updates(manual=False))
         self._connect()
+
+    def _t(self, key: str, **values: object) -> str:
+        return text(self.language, key, **values)
+
+    def _local_platform_label(self) -> str:
+        key = {"windows": "this_pc", "macos": "this_mac"}.get(
+            self.platform.key, "this_generic_device"
+        )
+        return self._t(key)
 
     def _build_ui(self) -> None:
         header = QFrame()
@@ -175,19 +259,21 @@ class MainWindow(QMainWindow):
         self.navigation = QVBoxLayout()
         self.navigation.setContentsMargins(12, 18, 12, 18)
         self.nav_buttons: list[NavigationButton] = []
-        for index, label in enumerate(("Synchronization", "Version history", "Recovery", "Settings")):
+        for index, key in enumerate(("synchronization", "version_history", "recovery", "settings")):
+            label = self._t(key)
             button = NavigationButton(label)
             button.clicked.connect(lambda checked=False, page=index: self.pages.setCurrentIndex(page))
             self.nav_buttons.append(button)
             self.navigation.addWidget(button)
         self.nav_buttons[0].setChecked(True)
         self.navigation.addStretch()
-        privacy = QLabel("Encrypted locally\nRecovery key stays on this device")
+        privacy = QLabel(self._t("sidebar_privacy"))
+        privacy.setWordWrap(True)
         privacy.setStyleSheet("color: #829599; font-size: 11px; padding: 8px;")
         self.navigation.addWidget(privacy)
         sidebar = QFrame()
         sidebar.setStyleSheet(f"background: {CHARCOAL};")
-        sidebar.setFixedWidth(190)
+        sidebar.setFixedWidth(220)
         sidebar.setLayout(self.navigation)
 
         self.pages = QStackedWidget()
@@ -212,11 +298,11 @@ class MainWindow(QMainWindow):
 
     def _sync_page(self) -> QWidget:
         page = QWidget()
-        title = QLabel("Synchronization")
+        title = QLabel(self._t("synchronization"))
         title.setProperty("role", "heading")
-        subtitle = QLabel("Controlled, encrypted updates between your devices.")
+        subtitle = QLabel(self._t("sync_subtitle"))
         subtitle.setProperty("role", "subtitle")
-        self.refresh_button = ActionButton("Refresh")
+        self.refresh_button = ActionButton(self._t("refresh"))
         self.refresh_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.refresh_button.clicked.connect(self.refresh)
         heading = QHBoxLayout()
@@ -228,25 +314,25 @@ class MainWindow(QMainWindow):
         heading.addStretch()
         heading.addWidget(self.refresh_button)
 
-        self.codex_status = StatusBlock("Codex process")
-        self.storage_status = StatusBlock("Cloud storage")
-        self.baseline_status = StatusBlock("Parent baseline")
+        self.codex_status = StatusBlock(self._t("codex_process"), language=self.language)
+        self.storage_status = StatusBlock(self._t("cloud_storage"), language=self.language)
+        self.baseline_status = StatusBlock(self._t("parent_baseline"), language=self.language)
         statuses = QGridLayout()
         statuses.setHorizontalSpacing(12)
         statuses.addWidget(self.codex_status, 0, 0)
         statuses.addWidget(self.storage_status, 0, 1)
         statuses.addWidget(self.baseline_status, 0, 2)
 
-        self.route = SyncRoute()
-        self.operation_banner = OperationBanner()
+        self.route = SyncRoute(language=self.language)
+        self.operation_banner = OperationBanner(language=self.language)
         self.operation_banner.cancel_requested.connect(self._cancel_pending_operation)
-        self.push_button = ActionButton("Sync to cloud", tone="primary")
-        self.pull_button = ActionButton("Sync from cloud", tone="incoming")
-        self.preview_button = ActionButton("Preview update")
+        self.push_button = ActionButton(self._t("sync_to_cloud"), tone="primary")
+        self.pull_button = ActionButton(self._t("sync_from_cloud"), tone="incoming")
+        self.preview_button = ActionButton(self._t("preview_update"))
         self.push_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp))
         self.pull_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown))
         self.push_button.clicked.connect(
-            lambda: self._confirm_run("Synchronize this device state to the cloud?", self._push)
+            lambda: self._confirm_run(self._t("sync_to_cloud_question"), self._push)
         )
         self.pull_button.clicked.connect(self._pull)
         self.preview_button.clicked.connect(self._pull)
@@ -259,13 +345,13 @@ class MainWindow(QMainWindow):
         route_frame.setProperty("card", True)
         route_layout = QVBoxLayout(route_frame)
         route_layout.setContentsMargins(18, 16, 18, 16)
-        route_layout.addWidget(QLabel("Synchronization route"))
+        route_layout.addWidget(QLabel(self._t("synchronization_route")))
         route_layout.addWidget(self.route)
         route_layout.addLayout(actions)
 
-        recent_title = QLabel("Recent versions")
+        recent_title = QLabel(self._t("recent_versions"))
         recent_title.setStyleSheet("font-size: 15px; font-weight: 700;")
-        self.recent_versions = VersionTable()
+        self.recent_versions = VersionTable(language=self.language)
         self.recent_versions.setMaximumHeight(205)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(28, 24, 28, 24)
@@ -288,12 +374,12 @@ class MainWindow(QMainWindow):
 
     def _history_page(self) -> QWidget:
         page = QWidget()
-        title = QLabel("Version history")
+        title = QLabel(self._t("version_history"))
         title.setProperty("role", "heading")
-        subtitle = QLabel("Immutable versions published by connected devices.")
+        subtitle = QLabel(self._t("history_subtitle"))
         subtitle.setProperty("role", "subtitle")
-        self.versions = VersionTable()
-        self.restore_button = ActionButton("Restore selected")
+        self.versions = VersionTable(language=self.language)
+        self.restore_button = ActionButton(self._t("restore_selected"))
         self.restore_button.clicked.connect(self._restore)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(28, 24, 28, 24)
@@ -306,15 +392,15 @@ class MainWindow(QMainWindow):
 
     def _recovery_page(self) -> QWidget:
         page = QWidget()
-        title = QLabel("Recovery")
+        title = QLabel(self._t("recovery"))
         title.setProperty("role", "heading")
-        subtitle = QLabel("Restore a protected baseline or a selected version.")
+        subtitle = QLabel(self._t("recovery_subtitle_main"))
         subtitle.setProperty("role", "subtitle")
-        self.baseline_detail = StatusBlock("Protected parent baseline")
-        self.baseline_button = ActionButton("Create protected baseline", tone="primary")
-        self.restore_baseline_button = ActionButton("Restore protected baseline")
+        self.baseline_detail = StatusBlock(self._t("protected_parent_baseline"), language=self.language)
+        self.baseline_button = ActionButton(self._t("create_protected_baseline"), tone="primary")
+        self.restore_baseline_button = ActionButton(self._t("restore_protected_baseline"))
         self.baseline_button.clicked.connect(
-            lambda: self._confirm_run("Create the immutable parent baseline?", self._baseline)
+            lambda: self._confirm_run(self._t("create_baseline_question"), self._baseline)
         )
         self.restore_baseline_button.clicked.connect(self._restore_baseline)
         actions = QHBoxLayout()
@@ -333,23 +419,42 @@ class MainWindow(QMainWindow):
 
     def _settings_page(self) -> QWidget:
         page = QWidget()
-        title = QLabel("Settings")
+        title = QLabel(self._t("settings"))
         title.setProperty("role", "heading")
         self.settings_summary = QLabel(
-            f"Device: {self.config.device_id}\n"
-            f"Platform: {self.platform.display_name}\n"
-            f"Storage: {self._provider_name()}\n"
-            f"Update check: every {self.config.poll_interval_seconds} seconds"
+            self._t(
+                "settings_summary",
+                device=self.config.device_id,
+                platform=self.platform.display_name,
+                storage=self._provider_name(),
+                seconds=self.config.poll_interval_seconds,
+                language_name=LANGUAGE_NAMES[self.language],
+            )
         )
         self.settings_summary.setObjectName("reviewSummary")
-        edit = ActionButton("Edit connection settings")
+        self.language_combo = QComboBox()
+        for code, name in LANGUAGE_NAMES.items():
+            self.language_combo.addItem(name, code)
+        self.language_combo.setCurrentIndex(max(0, self.language_combo.findData(self.language)))
+        language_form = QFormLayout()
+        language_form.addRow(self._t("language"), self.language_combo)
+        self.language_combo.currentIndexChanged.connect(self._change_language)
+        updates_label = QLabel(self._t("updates"))
+        updates_label.setStyleSheet("font-weight: 700;")
+        self.update_button = ActionButton(self._t("check_for_updates"))
+        self.update_button.clicked.connect(lambda: self._check_for_updates(manual=True))
+        edit = ActionButton(self._t("edit_connection_settings"))
         edit.clicked.connect(self._settings)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(28, 24, 28, 24)
         layout.addWidget(title)
         layout.addSpacing(12)
         layout.addWidget(self.settings_summary)
+        layout.addLayout(language_form)
         layout.addWidget(edit, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addSpacing(12)
+        layout.addWidget(updates_label)
+        layout.addWidget(self.update_button, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addStretch()
         return page
 
@@ -357,17 +462,17 @@ class MainWindow(QMainWindow):
         self.tray = QSystemTrayIcon(load_app_icon(), self)
         self.tray.setToolTip("Codex Handoff")
         menu = QMenu()
-        show_action = QAction("Show", self)
+        show_action = QAction(self._t("show"), self)
         show_action.triggered.connect(self._show_from_tray)
-        push_action = QAction("Sync to cloud", self)
+        push_action = QAction(self._t("sync_to_cloud"), self)
         push_action.triggered.connect(
-            lambda: self._confirm_run("Synchronize this device state to the cloud?", self._push)
+            lambda: self._confirm_run(self._t("sync_to_cloud_question"), self._push)
         )
-        pull_action = QAction("Sync from cloud", self)
+        pull_action = QAction(self._t("sync_from_cloud"), self)
         pull_action.triggered.connect(self._pull)
-        check_action = QAction("Check now", self)
+        check_action = QAction(self._t("check_now"), self)
         check_action.triggered.connect(self._check_now)
-        quit_action = QAction("Quit", self)
+        quit_action = QAction(self._t("quit"), self)
         quit_action.triggered.connect(self._quit)
         for action in (show_action, push_action, pull_action, check_action):
             menu.addAction(action)
@@ -378,16 +483,43 @@ class MainWindow(QMainWindow):
         self.tray.show()
 
     def _provider_name(self) -> str:
-        return "Google Drive" if self.config.provider == "google_drive" else "Local folder"
+        return "Google Drive" if self.config.provider == "google_drive" else self._t("local_folder")
+
+    def _change_language(self) -> None:
+        selected = normalize_language(str(self.language_combo.currentData()))
+        if selected == self.language:
+            return
+        self.config = replace(self.config, language=selected)
+        save_config(self.config, self.config_path)
+        self.language = selected
+        QTimer.singleShot(0, self._reload_interface)
+
+    def _reload_interface(self) -> None:
+        self.ui_generation += 1
+        if self.monitor:
+            self.monitor.stop()
+            self.monitor = None
+        self.service = None
+        old_tray = self.tray
+        old_tray.hide()
+        old_tray.deleteLater()
+        old_content = self.takeCentralWidget()
+        if old_content:
+            old_content.deleteLater()
+        self._build_ui()
+        self._build_tray()
+        self._connect()
 
     def _connect(self) -> None:
-        self.statusBar().showMessage("Connecting to storage...")
-        self.storage_status.set_state("Connecting...", StatusTone.NEUTRAL)
+        self.statusBar().showMessage(self._t("connecting_storage"))
+        self.storage_status.set_state(self._t("connecting"), StatusTone.NEUTRAL)
         self._run(lambda: HandoffService(self.config, create_provider(self.config)), self._connected)
 
     def _connected(self, service: object) -> None:
         self.service = service  # type: ignore[assignment]
-        self.storage_status.set_state(f"{self._provider_name()} connected", StatusTone.SUCCESS)
+        self.storage_status.set_state(
+            self._t("provider_connected", provider=self._provider_name()), StatusTone.SUCCESS
+        )
         self.monitor = RemoteHeadMonitor(
             self.service.remote_head,
             interval_seconds=self.config.poll_interval_seconds,
@@ -396,7 +528,11 @@ class MainWindow(QMainWindow):
         )
         self.monitor.head_changed.connect(self._remote_head_changed)
         self.monitor.offline.connect(self._monitor_offline)
-        self.monitor.recovered.connect(lambda: self.storage_status.set_state(f"{self._provider_name()} connected", StatusTone.SUCCESS))
+        self.monitor.recovered.connect(
+            lambda: self.storage_status.set_state(
+                self._t("provider_connected", provider=self._provider_name()), StatusTone.SUCCESS
+            )
+        )
         if self.config.monitoring_enabled:
             self.monitor.start(immediate=False)
         self.refresh()
@@ -406,17 +542,28 @@ class MainWindow(QMainWindow):
         if self.monitor:
             self.monitor.pause()
         worker = Worker(function)
+        generation = self.ui_generation
         self.workers.add(worker)
-        worker.signals.completed.connect(lambda value, current=worker: self._worker_completed(current, value, completed))
-        worker.signals.failed.connect(lambda message, current=worker: self._worker_failed(current, message))
+        worker.signals.completed.connect(
+            lambda value, current=worker: self._worker_completed(
+                current, value, completed, generation
+            )
+        )
+        worker.signals.failed.connect(
+            lambda message, current=worker: self._worker_failed(current, message, generation)
+        )
         self.pool.start(worker)
 
-    def _worker_completed(self, worker: Worker, value: object, callback) -> None:
+    def _worker_completed(self, worker: Worker, value: object, callback, generation: int) -> None:
         self.workers.discard(worker)
+        if generation != self.ui_generation:
+            return
         self._done(value, callback)
 
-    def _worker_failed(self, worker: Worker, message: str) -> None:
+    def _worker_failed(self, worker: Worker, message: str, generation: int) -> None:
         self.workers.discard(worker)
+        if generation != self.ui_generation:
+            return
         self._failed(message)
 
     def _done(self, value: object, callback) -> None:
@@ -435,7 +582,7 @@ class MainWindow(QMainWindow):
         if self.monitor and self.config.monitoring_enabled:
             self.monitor.resume(immediate=False)
         self.operation_banner.show_message(message, StatusTone.ERROR)
-        self.statusBar().showMessage("Operation failed")
+        self.statusBar().showMessage(self._t("operation_failed"))
         QMessageBox.critical(self, "Codex Handoff", message)
 
     def _set_busy(self, busy: bool) -> None:
@@ -447,6 +594,7 @@ class MainWindow(QMainWindow):
             self.restore_button,
             self.restore_baseline_button,
             self.refresh_button,
+            self.update_button,
         ):
             button.setEnabled(not busy)
 
@@ -457,14 +605,14 @@ class MainWindow(QMainWindow):
         self.pending_operation = (operation, completed)
         self._set_busy(True)
         self.operation_banner.show_message(
-            "Close Codex. The confirmed operation starts automatically when it exits.",
+            self._t("close_codex_wait"),
             StatusTone.WARNING,
             cancellable=True,
         )
         QMessageBox.warning(
             self,
-            "Close Codex",
-            "Codex is still running. Close it to continue, or cancel the waiting operation.",
+            self._t("close_codex"),
+            self._t("close_codex_message"),
         )
 
     def _try_pending_operation(self) -> None:
@@ -479,60 +627,77 @@ class MainWindow(QMainWindow):
         self.pending_operation = None
         self.operation_banner.hide()
         self._set_busy(False)
-        self.statusBar().showMessage("Waiting operation cancelled", 5000)
+        self.statusBar().showMessage(self._t("waiting_cancelled"), 5000)
 
     def refresh(self) -> None:
         if self.service is not None:
-            self.statusBar().showMessage("Refreshing...")
+            self.statusBar().showMessage(self._t("refreshing"))
             self._run(lambda: (self.service.status(), self.service.list_versions()), self._show_status)
 
     def _background_refresh(self) -> None:
         if self.service is None or self.pool.activeThreadCount() > 0:
             return
         worker = Worker(lambda: (self.service.status(), self.service.list_versions()))
+        generation = self.ui_generation
         self.workers.add(worker)
-        worker.signals.completed.connect(lambda value, current=worker: self._background_completed(current, value))
-        worker.signals.failed.connect(lambda message, current=worker: self._background_failed(current, message))
+        worker.signals.completed.connect(
+            lambda value, current=worker: self._background_completed(current, value, generation)
+        )
+        worker.signals.failed.connect(
+            lambda message, current=worker: self._background_failed(current, message, generation)
+        )
         self.pool.start(worker)
 
-    def _background_completed(self, worker: Worker, value: object) -> None:
+    def _background_completed(self, worker: Worker, value: object, generation: int) -> None:
         self.workers.discard(worker)
+        if generation != self.ui_generation:
+            return
         self._show_status(value)
 
-    def _background_failed(self, worker: Worker, message: str) -> None:
+    def _background_failed(self, worker: Worker, message: str, generation: int) -> None:
         self.workers.discard(worker)
+        if generation != self.ui_generation:
+            return
         self._monitor_offline(message)
 
     def _show_status(self, result: object) -> None:
         status, versions = result  # type: ignore[misc]
         self.device_label.setText(str(status["device_id"]))
         codex_running = bool(status["codex_running"])
-        self.codex_label.setText("Running" if codex_running else "Closed")
+        self.codex_label.setText(self._t("running" if codex_running else "closed"))
         self.codex_status.set_state(
-            "Running - close before sync" if codex_running else "Closed - ready",
+            self._t("running_close" if codex_running else "closed_ready"),
             StatusTone.WARNING if codex_running else StatusTone.SUCCESS,
         )
         baseline_id = str(status["baseline_id"] or "")
-        self.baseline_label.setText(baseline_id or "Not created")
-        self.baseline_status.set_state("Protected" if baseline_id else "Not created", StatusTone.SUCCESS if baseline_id else StatusTone.WARNING)
-        self.baseline_detail.set_state(baseline_id or "No protected baseline", StatusTone.SUCCESS if baseline_id else StatusTone.WARNING)
-        self.local_label.setText(str(status["last_applied_version"] or "None"))
-        self.remote_label.setText(str(status["remote_head"] or "None"))
+        self.baseline_label.setText(baseline_id or self._t("not_created"))
+        self.baseline_status.set_state(
+            self._t("protected" if baseline_id else "not_created"),
+            StatusTone.SUCCESS if baseline_id else StatusTone.WARNING,
+        )
+        self.baseline_detail.set_state(
+            baseline_id or self._t("no_protected_baseline"),
+            StatusTone.SUCCESS if baseline_id else StatusTone.WARNING,
+        )
+        self.local_label.setText(str(status["last_applied_version"] or self._t("none")))
+        self.remote_label.setText(str(status["remote_head"] or self._t("none")))
         update_available = bool(status["update_available"])
         requires_initial_sync = bool(status.get("requires_initial_sync"))
         can_publish = bool(status.get("can_publish"))
         self.requires_initial_sync = requires_initial_sync
         self.remote_update_available = update_available
-        self.update_label.setText("Available" if update_available else "Up to date")
+        self.update_label.setText(self._t("available" if update_available else "up_to_date"))
         if requires_initial_sync:
-            self.update_label.setText("Initial sync required")
+            self.update_label.setText(self._t("initial_sync_required"))
         self.preview_button.setEnabled(update_available)
         self.pull_button.setText(
-            "Initialize from baseline" if requires_initial_sync and not update_available else "Sync from cloud"
+            self._t("initialize_from_baseline")
+            if requires_initial_sync and not update_available
+            else self._t("sync_from_cloud")
         )
         self.pull_button.setEnabled(update_available or requires_initial_sync)
         self.route.set_route(
-            self.platform.local_label,
+            self._local_platform_label(),
             str(status["device_id"]),
             self._provider_name(),
             str(status["remote_source"]) if status["remote_source"] else None,
@@ -545,9 +710,9 @@ class MainWindow(QMainWindow):
             self.restore_baseline_button.setEnabled(has_baseline)
             if requires_initial_sync:
                 instruction = (
-                    "This is a new device. Review and apply the latest cloud version before publishing."
+                    self._t("new_device_apply")
                     if update_available
-                    else "This is a new device. Initialize it from the protected baseline before publishing."
+                    else self._t("new_device_baseline")
                 )
                 self.operation_banner.show_message(instruction, StatusTone.WARNING)
             elif self.operation_banner.isVisible():
@@ -556,13 +721,13 @@ class MainWindow(QMainWindow):
         self.recent_versions.set_versions(versions[:3])
         if self.monitor:
             self.monitor.last_version_id = str(status["remote_head"]) if status["remote_head"] else None
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage(self._t("ready"))
 
     def _remote_head_changed(self, head: RemoteHead) -> None:
         if head.version_id != self.last_notified_version:
             self.tray.showMessage(
-                "Codex synchronization update available",
-                f"A new encrypted version from {head.source_device} is ready to review.",
+                self._t("update_available_title"),
+                self._t("update_available_message", device=head.source_device),
                 QSystemTrayIcon.MessageIcon.Information,
                 8000,
             )
@@ -570,8 +735,10 @@ class MainWindow(QMainWindow):
         self._background_refresh()
 
     def _monitor_offline(self, message: str) -> None:
-        self.storage_status.set_state("Offline", StatusTone.ERROR)
-        self.operation_banner.show_message(f"Storage check failed: {message}", StatusTone.ERROR)
+        self.storage_status.set_state(self._t("offline"), StatusTone.ERROR)
+        self.operation_banner.show_message(
+            self._t("storage_check_failed", message=message), StatusTone.ERROR
+        )
 
     def _check_now(self) -> None:
         if self.monitor:
@@ -579,8 +746,112 @@ class MainWindow(QMainWindow):
         else:
             self.refresh()
 
+    def _check_for_updates(self, *, manual: bool) -> None:
+        if self.updater is None or (manual and not is_packaged_application()):
+            if manual:
+                QMessageBox.information(
+                    self,
+                    self._t("updates"),
+                    self._t("updates_installed_only"),
+                )
+            return
+        if not manual and not self.updater.should_check():
+            return
+        if manual:
+            self.statusBar().showMessage(self._t("checking_for_updates"))
+            self._run(
+                self.updater.check,
+                lambda result: self._update_checked(result, manual=True),
+            )
+            return
+        worker = Worker(self.updater.check)
+        generation = self.ui_generation
+        self.workers.add(worker)
+        worker.signals.completed.connect(
+            lambda result, current=worker: self._silent_update_check_completed(
+                current, result, generation
+            )
+        )
+        worker.signals.failed.connect(
+            lambda _message, current=worker: self.workers.discard(current)
+        )
+        self.pool.start(worker)
+
+    def _silent_update_check_completed(
+        self, worker: Worker, result: object, generation: int
+    ) -> None:
+        self.workers.discard(worker)
+        if generation != self.ui_generation:
+            return
+        self._update_checked(result, manual=False)
+
+    def _update_checked(self, result: object, *, manual: bool) -> None:
+        update = result if isinstance(result, UpdateInfo) else None
+        if update is None:
+            if manual:
+                QMessageBox.information(
+                    self,
+                    self._t("updates"),
+                    self._t("latest_version_installed"),
+                )
+            self.statusBar().showMessage(self._t("ready"))
+            return
+        dialog = ApplicationUpdateDialog(
+            update,
+            __version__,
+            self,
+            language=self.language,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            assert self.updater is not None
+            self.statusBar().showMessage(self._t("downloading_update"))
+            self._run(
+                lambda: self.updater.download(update),
+                self._confirm_install_update,
+            )
+
+    def _confirm_install_update(self, package: object) -> None:
+        dialog = QMessageBox(
+            QMessageBox.Icon.Question,
+            self._t("install_update_title"),
+            self._t("install_update_question"),
+            parent=self,
+        )
+        dialog.setStandardButtons(
+            QMessageBox.StandardButton.Apply | QMessageBox.StandardButton.Cancel
+        )
+        dialog.button(QMessageBox.StandardButton.Apply).setText(self._t("install_now"))
+        dialog.button(QMessageBox.StandardButton.Cancel).setText(self._t("cancel"))
+        if dialog.exec() == QMessageBox.StandardButton.Apply:
+            self._install_update(package)
+        else:
+            self.statusBar().showMessage(self._t("ready"))
+
+    def _install_update(self, package: object) -> None:
+        try:
+            launch_update(
+                Path(package),
+                self.platform.key,
+                application=application_path(),
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                self._t("updates"),
+                self._t("update_launch_failed", message=str(exc)),
+            )
+            self.statusBar().showMessage(self._t("operation_failed"))
+            return
+        self._quit()
+
     def _confirm_run(self, question: str, operation) -> None:
-        if QMessageBox.question(self, "Confirm", question) == QMessageBox.StandardButton.Yes:
+        dialog = QMessageBox(QMessageBox.Icon.Question, self._t("confirm"), question, parent=self)
+        dialog.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+        )
+        dialog.button(QMessageBox.StandardButton.Yes).setText(self._t("confirm_action"))
+        dialog.button(QMessageBox.StandardButton.Cancel).setText(self._t("cancel"))
+        if dialog.exec() == QMessageBox.StandardButton.Yes:
             self._run_when_codex_stopped(operation, lambda _: self.refresh())
 
     def _baseline(self):
@@ -599,11 +870,11 @@ class MainWindow(QMainWindow):
             self._run(self.service.preview_pull, self._confirm_pull)
 
     def build_preview_dialog(self, preview: ApplyPreview) -> UpdatePreviewDialog:
-        return UpdatePreviewDialog(preview, self)
+        return UpdatePreviewDialog(preview, self, language=self.language)
 
     def _confirm_pull(self, preview: object) -> None:
         if preview is None:
-            QMessageBox.information(self, "Codex Handoff", "No update is available.")
+            QMessageBox.information(self, "Codex Handoff", self._t("no_update"))
             return
         dialog = self.build_preview_dialog(preview)  # type: ignore[arg-type]
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -613,10 +884,10 @@ class MainWindow(QMainWindow):
     def _restore(self) -> None:
         identifier = self.versions.selected_version_id()
         if identifier is None or self.service is None:
-            QMessageBox.information(self, "Codex Handoff", "Select a version first.")
+            QMessageBox.information(self, "Codex Handoff", self._t("select_version_first"))
             return
         self._confirm_run(
-            f"Restore {identifier}? A local backup will be created first.",
+            self._t("restore_version_question", version=identifier),
             lambda: self.service.restore(identifier),
         )
 
@@ -624,11 +895,11 @@ class MainWindow(QMainWindow):
         if self.service is None:
             return
         baseline_id = self.baseline_label.text()
-        if not baseline_id or baseline_id == "Not created":
-            QMessageBox.information(self, "Codex Handoff", "No protected baseline is available.")
+        if not baseline_id or baseline_id == self._t("not_created"):
+            QMessageBox.information(self, "Codex Handoff", self._t("no_baseline_available"))
             return
         self._confirm_run(
-            f"Restore protected baseline {baseline_id}? A local backup will be created first.",
+            self._t("restore_baseline_question", baseline=baseline_id),
             lambda: self.service.restore(baseline_id),
         )
 
@@ -636,10 +907,8 @@ class MainWindow(QMainWindow):
         dialog = SetupWizard(self.config_path)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.config = load_config(self.config_path)
-            if self.monitor:
-                self.monitor.stop()
-            self.service = None
-            self._connect()
+            self.language = normalize_language(self.config.language)
+            self._reload_interface()
 
     def _show_from_tray(self) -> None:
         self.show()
@@ -664,8 +933,8 @@ class MainWindow(QMainWindow):
             self.hide()
             if not self.config.close_notice_seen:
                 self.tray.showMessage(
-                    "Codex Handoff is still running",
-                    "Synchronization monitoring continues in the system tray.",
+                    self._t("still_running_title"),
+                    self._t("still_running_message"),
                     QSystemTrayIcon.MessageIcon.Information,
                     6000,
                 )

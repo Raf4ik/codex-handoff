@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..models import RemoteHead
+from .i18n import text
 
 
 def _refresh_style(widget: QWidget) -> None:
@@ -31,14 +32,14 @@ class StatusTone(str, Enum):
 
 
 class StatusBlock(QFrame):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+    def __init__(self, title: str, parent: QWidget | None = None, *, language: str = "en") -> None:
         super().__init__(parent)
         self.setProperty("card", True)
         self.setProperty("tone", StatusTone.NEUTRAL.value)
         self.setMinimumHeight(76)
         self.title_label = QLabel(title)
         self.title_label.setProperty("role", "subtitle")
-        self.value_label = QLabel("Checking...")
+        self.value_label = QLabel(text(language, "checking"))
         self.value_label.setStyleSheet("font-weight: 700;")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
@@ -89,11 +90,12 @@ class _Endpoint(QFrame):
 
 
 class SyncRoute(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, language: str = "en") -> None:
         super().__init__(parent)
-        self.local = _Endpoint("This device")
-        self.cloud = _Endpoint("Storage")
-        self.remote = _Endpoint("Latest source")
+        self.language = language
+        self.local = _Endpoint(text(language, "this_generic_device"))
+        self.cloud = _Endpoint(text(language, "rail_storage"))
+        self.remote = _Endpoint(text(language, "latest_source"))
         self.local_title = self.local.title
         self.local_detail = self.local.detail
         self.remote_title = self.remote.title
@@ -123,16 +125,19 @@ class SyncRoute(QWidget):
         self.local.title.setText(local_label)
         self.local.detail.setText(local_device)
         self.cloud.title.setText(provider)
-        self.cloud.detail.setText("Encrypted versions")
+        self.cloud.detail.setText(text(self.language, "encrypted_versions"))
         remote_names = {"windows": "Windows", "macos": "macOS"}
-        self.remote.title.setText(remote_names.get(remote_platform or "", "Latest source"))
-        self.remote.detail.setText(remote_device or "No published versions")
+        self.remote.title.setText(remote_names.get(remote_platform or "", text(self.language, "latest_source")))
+        self.remote.detail.setText(remote_device or text(self.language, "no_published_versions"))
 
 
 class VersionTable(QTableWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, language: str = "en") -> None:
         super().__init__(0, 4, parent)
-        self.setHorizontalHeaderLabels(("VERSION", "SOURCE", "PLATFORM", "CREATED"))
+        self.language = language
+        self.setHorizontalHeaderLabels(
+            tuple(text(language, key) for key in ("version", "source", "platform", "created"))
+        )
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -146,7 +151,7 @@ class VersionTable(QTableWidget):
             values = (
                 version.version_id,
                 version.source_device,
-                platform_names.get(version.source_platform or "", "Unknown"),
+                platform_names.get(version.source_platform or "", text(self.language, "unknown")),
                 version.created_at,
             )
             for column, value in enumerate(values):
@@ -165,12 +170,12 @@ class VersionTable(QTableWidget):
 class OperationBanner(QFrame):
     cancel_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, language: str = "en") -> None:
         super().__init__(parent)
         self.setProperty("card", True)
         self.message = QLabel()
         self.message.setWordWrap(True)
-        self.cancel_button = ActionButton("Cancel")
+        self.cancel_button = ActionButton(text(language, "cancel"))
         self.cancel_button.clicked.connect(self.cancel_requested)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 10, 14, 10)

@@ -44,3 +44,20 @@ def test_setup_wizard_can_join_existing_pair(tmp_path: Path) -> None:
     assert "replacing" in wizard.pairing_page.explanation.text()
     wizard.close()
     assert app is not None
+
+
+def test_setup_wizard_switches_to_russian_without_losing_values(tmp_path: Path) -> None:
+    app = QApplication.instance() or QApplication([])
+    wizard = SetupWizard(tmp_path / "config.json")
+    wizard.device.setText("MacBook-Pro")
+
+    wizard.language.setCurrentIndex(wizard.language.findData("ru"))
+
+    assert wizard.windowTitle() == "Настройка Codex Handoff"
+    assert wizard.device.text() == "MacBook-Pro"
+    assert wizard.device_page.language_label.text() == "Язык"
+    assert wizard.continue_button.text() == "Продолжить"
+    assert wizard.pairing_page.mode.itemText(1) == "Подключиться к существующей паре"
+    assert wizard._config().language == "ru"
+    wizard.close()
+    assert app is not None

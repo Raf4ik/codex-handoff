@@ -98,7 +98,14 @@ jobs:
           $process = Start-Process $app -ArgumentList '--background' -PassThru
           Start-Sleep -Seconds 5
           if ($process.HasExited) { throw "Installed application exited during smoke test" }
-          Stop-Process -Id $process.Id -Force
+          Start-Process $installer -ArgumentList '/VERYSILENT','/CURRENTUSER','/CLOSEAPPLICATIONS','/NORESTARTAPPLICATIONS' -Wait
+          $process.WaitForExit(10000)
+          if (-not $process.HasExited) { throw "In-place update did not close the running application" }
+          if (-not (Test-Path $app)) { throw "Executable missing after in-place update" }
+          $updatedProcess = Start-Process $app -ArgumentList '--background' -PassThru
+          Start-Sleep -Seconds 5
+          if ($updatedProcess.HasExited) { throw "Updated application exited during smoke test" }
+          Stop-Process -Id $updatedProcess.Id -Force
           Start-Process $uninstaller -ArgumentList '/VERYSILENT' -Wait
           if (Test-Path $app) { throw "Application files remain after uninstall" }
           if (Test-Path $desktopShortcut) { throw "Desktop shortcut remains after uninstall" }
@@ -132,7 +139,7 @@ jobs:
           sha256sum CodexHandoff-macOS-arm64.dmg CodexHandoff-Windows-x64-Setup.exe > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
-          body_path: docs/RELEASE_NOTES_v0.2.0-beta.2.md
+          body_path: docs/RELEASE_NOTES_v0.2.0-beta.3.md
           prerelease: true
           files: |
             release-assets/CodexHandoff-macOS-arm64.dmg
