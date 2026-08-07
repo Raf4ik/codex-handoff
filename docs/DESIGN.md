@@ -8,7 +8,7 @@ The first release includes a shared Python core, CLI, PySide6 desktop GUI, a loc
 
 Codex must be closed before baseline creation, push, pull, or restore. Every apply creates a local pre-apply backup. Snapshots and baselines are immutable ZIP artifacts with an embedded manifest and SHA-256 digest for every file, wrapped in an AES-256-GCM encrypted container before storage. A baseline is never pruned, updated, or deleted by the application.
 
-Each device stores its own `last_applied_version`. A push is rejected when the remote head differs from that value, preventing a stale machine from overwriting a newer handoff. Pull is explicit and requires confirmation. Authentication tokens, machine-specific configuration, caches, locks, sockets, temporary files, SQLite databases, and active journals are excluded from the default portable profile. Sessions, archived sessions, attachments, session index, skills, plugins, rules, and `AGENTS.md` are included.
+Each device stores its own `last_applied_version`. A push is rejected when the remote head differs from that value, preventing a stale machine from overwriting a newer synchronization version. Pull is explicit and requires confirmation. Authentication tokens, machine-specific configuration, caches, locks, sockets, temporary files, SQLite databases, and active journals are excluded from the default portable profile. Sessions, archived sessions, attachments, session index, skills, plugins, rules, and `AGENTS.md` are included.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Each device stores its own `last_applied_version`. A push is rejected when the r
 
 The provider creates an app-owned `Codex Handoff` folder. Immutable artifacts use unique `.chandoff` names. `head.json` is the only mutable object. Publishing uploads and verifies the immutable artifact before updating `head.json`. The client reads the head again after update and stops on inconsistency.
 
-Google Drive is not a transactional database, so simultaneous publication remains unsupported. The user-facing handoff protocol and stale-device check are mandatory. A later server backend can provide strict compare-and-swap without changing the core service interface.
+Google Drive is not a transactional database, so simultaneous publication remains unsupported. The user-facing synchronization protocol and stale-device check are mandatory. A later server backend can provide strict compare-and-swap without changing the core service interface.
 
 ## GUI
 

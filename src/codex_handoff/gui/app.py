@@ -193,8 +193,8 @@ class MainWindow(QMainWindow):
         self.update_label = QLabel()
         self.versions = QListWidget()
         self.baseline_button = QPushButton("Create baseline")
-        self.push_button = QPushButton("Send snapshot")
-        self.pull_button = QPushButton("Receive update")
+        self.push_button = QPushButton("Sync to cloud")
+        self.pull_button = QPushButton("Sync from cloud")
         self.restore_button = QPushButton("Restore selected")
         self.restore_baseline_button = QPushButton("Restore baseline")
         self.refresh_button = QPushButton("Refresh")
@@ -208,7 +208,7 @@ class MainWindow(QMainWindow):
         self.restore_baseline_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
         self.cancel_wait_button.setIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton))
         self.baseline_button.clicked.connect(lambda: self._confirm_run("Create the immutable parent baseline?", self._baseline))
-        self.push_button.clicked.connect(lambda: self._confirm_run("Publish this device state? Codex must be closed.", self._push))
+        self.push_button.clicked.connect(lambda: self._confirm_run("Synchronize this device state to the cloud?", self._push))
         self.pull_button.clicked.connect(self._pull)
         self.restore_button.clicked.connect(self._restore)
         self.restore_baseline_button.clicked.connect(self._restore_baseline)
@@ -376,8 +376,8 @@ class MainWindow(QMainWindow):
         if status["update_available"] and status["remote_head"] != self.last_notified_version:
             source = status["remote_source"] or "another device"
             self.tray.showMessage(
-                "Codex Handoff update available",
-                f"A new Codex snapshot from {source} is ready to review.",
+                "Codex synchronization update available",
+                f"A new encrypted snapshot from {source} is ready to review and synchronize.",
                 QSystemTrayIcon.Information,
                 8000,
             )
