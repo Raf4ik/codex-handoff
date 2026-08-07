@@ -31,6 +31,8 @@ from ..config import AppConfig, default_config_path, default_workspace, load_con
 from ..crypto import generate_recovery_key
 from ..processes import is_codex_running
 from ..service import HandoffService, create_provider
+from .setup import SetupWizard
+from .theme import apply_theme, load_app_icon
 
 
 class SetupDialog(QDialog):
@@ -154,6 +156,9 @@ class SetupDialog(QDialog):
         self.accept()
 
 
+SetupDialog = SetupWizard
+
+
 class WorkerSignals(QObject):
     completed = Signal(object)
     failed = Signal(str)
@@ -236,7 +241,7 @@ class MainWindow(QMainWindow):
         container.setLayout(body)
         self.setCentralWidget(container)
         self.setStatusBar(QStatusBar())
-        app_icon = self.style().standardIcon(QStyle.SP_DriveNetIcon)
+        app_icon = load_app_icon()
         self.setWindowIcon(app_icon)
         self.tray = QSystemTrayIcon(app_icon, self)
         self.tray.setToolTip("Codex Handoff")
@@ -446,6 +451,9 @@ class MainWindow(QMainWindow):
 def launch_gui(config_path: Path | None = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Codex Handoff")
+    app.setApplicationDisplayName("Codex Handoff")
+    app.setWindowIcon(load_app_icon())
+    apply_theme(app)
     path = config_path or default_config_path()
     if not path.is_file():
         dialog = SetupDialog(path)
