@@ -98,7 +98,9 @@ jobs:
           $process = Start-Process $app -ArgumentList '--background' -PassThru
           Start-Sleep -Seconds 5
           if ($process.HasExited) { throw "Installed application exited during smoke test" }
-          Start-Process $installer -ArgumentList '/VERYSILENT','/CURRENTUSER','/CLOSEAPPLICATIONS','/NORESTARTAPPLICATIONS','/UPDATE=1' -Wait
+          $updateInstaller = Start-Process $installer -ArgumentList '/VERYSILENT','/CURRENTUSER','/CLOSEAPPLICATIONS','/NORESTARTAPPLICATIONS','/UPDATE=1' -PassThru
+          $updateInstaller.WaitForExit()
+          if ($updateInstaller.ExitCode -ne 0) { throw "In-place update installer failed" }
           $process.WaitForExit(10000)
           if (-not $process.HasExited) { throw "In-place update did not close the running application" }
           if (-not (Test-Path $app)) { throw "Executable missing after in-place update" }

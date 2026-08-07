@@ -51,6 +51,7 @@ def test_tagged_release_contains_only_installers_and_checksums() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-build.yml").read_text(encoding="utf-8")
 
     assert "body_path: docs/RELEASE_NOTES_v0.2.0-beta.4.md" in workflow
+    assert "In-place update installer failed" in workflow
     assert "In-place update did not close the running application" in workflow
     assert "Updated application did not relaunch automatically" in workflow
     assert "'/UPDATE=1'" in workflow
